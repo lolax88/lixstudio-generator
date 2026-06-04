@@ -213,7 +213,7 @@ function nodeNetwork(color: string, style: LogoStyle): string {
     { x: 35, y: 35, r: 2.5, primary: false },
     { x: 65, y: 55, r: 2, primary: false },
     { x: 20, y: 50, r: 2, primary: false },
-    { x: 80, cy: 45, r: 2, primary: false },
+    { x: 80, y: 45, r: 2, primary: false },
   ];
   const edges = [
     { from: 0, to: 1 },
