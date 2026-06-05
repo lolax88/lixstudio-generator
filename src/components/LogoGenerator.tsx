@@ -71,9 +71,11 @@ export default function LogoGenerator() {
   const [selectedPattern, setSelectedPattern] = useState<DesignPattern>('node-network');
   const [mode, setMode] = useState<GenerationMode>('free');
 
-  // BYOK: User's API key (persisted in localStorage)
+  // BYOK: User's API keys (persisted in localStorage)
   const [userAPIKey, setUserAPIKey] = useState('');
+  const [userHFKey, setUserHFKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showHFKey, setShowHFKey] = useState(false);
 
   // AI color picker
   const [primaryColor, setPrimaryColor] = useState('#7C3AED');
@@ -85,16 +87,23 @@ export default function LogoGenerator() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
-  // Load API key from localStorage on mount
+  // Load API keys from localStorage on mount
   useEffect(() => {
-    const saved = localStorage.getItem('lixstudio-api-key');
-    if (saved) setUserAPIKey(saved);
+    const savedTogether = localStorage.getItem('lixstudio-api-key');
+    const savedHF = localStorage.getItem('lixstudio-hf-key');
+    if (savedTogether) setUserAPIKey(savedTogether);
+    if (savedHF) setUserHFKey(savedHF);
   }, []);
 
-  // Save API key to localStorage
+  // Save API keys to localStorage
   const handleApiKeyChange = useCallback((val: string) => {
     setUserAPIKey(val);
     localStorage.setItem('lixstudio-api-key', val);
+  }, []);
+
+  const handleHFKeyChange = useCallback((val: string) => {
+    setUserHFKey(val);
+    localStorage.setItem('lixstudio-hf-key', val);
   }, []);
 
   // Update palette when industry changes
@@ -137,6 +146,7 @@ export default function LogoGenerator() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userAPIKey: userAPIKey || undefined,
+          userHFKey: userHFKey || undefined,
           brandName: brandName || 'Brand',
           industry,
           style: aiStyle,
@@ -215,36 +225,65 @@ export default function LogoGenerator() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Controls Panel */}
           <div className="lg:col-span-5 space-y-6">
-            {/* BYOK: API Key (Premium mode only) */}
+            {/* BYOK: API Keys (Premium mode only) */}
             {mode === 'premium' && (
               <div className="bg-gray-900/50 rounded-2xl border border-gray-800/50 p-5">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Together AI API Key
-                  <span className="ml-2 text-xs text-gray-500">(optional — uses server key if empty)</span>
+                <label className="block text-sm font-medium text-gray-300 mb-3">
+                  🔑 API Keys
+                  <span className="ml-2 text-xs text-gray-500">(optional — free fallback auto-used)</span>
                 </label>
-                <div className="relative">
-                  <input
-                    type={showApiKey ? 'text' : 'password'}
-                    value={userAPIKey}
-                    onChange={e => handleApiKeyChange(e.target.value)}
-                    placeholder="Enter your own API key"
-                    className="w-full px-4 py-3 pr-10 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/30 transition-all text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
-                  >
-                    {showApiKey ? '🙈' : '👁️'}
-                  </button>
+
+                {/* Hugging Face Key (FREE) */}
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-xs font-medium text-green-400">🤗 Hugging Face</span>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-green-500/20 text-green-300 rounded-full">FREE</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showHFKey ? 'text' : 'password'}
+                      value={userHFKey}
+                      onChange={e => handleHFKeyChange(e.target.value)}
+                      placeholder="hf_xxxxxxxx (free token)"
+                      className="w-full px-4 py-2.5 pr-10 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 focus:ring-1 focus:ring-green-500/30 transition-all text-sm"
+                    />
+                    <button type="button" onClick={() => setShowHFKey(!showHFKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
+                      {showHFKey ? '🙈' : '👁️'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Get free token at{' '}
+                    <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener" className="text-green-400 hover:underline">
+                      huggingface.co/settings/tokens
+                    </a>
+                  </p>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Get free $5 credit at{' '}
-                  <a href="https://api.together.xyz" target="_blank" rel="noopener" className="text-orange-400 hover:underline">
-                    api.together.xyz
-                  </a>
-                  {' '}— ~1,600 logos
-                </p>
+
+                {/* Together AI Key (Paid, $5 free credit) */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-xs font-medium text-orange-400">⚡ Together AI</span>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-orange-500/20 text-orange-300 rounded-full">$5 FREE</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showApiKey ? 'text' : 'password'}
+                      value={userAPIKey}
+                      onChange={e => handleApiKeyChange(e.target.value)}
+                      placeholder="key_xxxxxxxx"
+                      className="w-full px-4 py-2.5 pr-10 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/30 transition-all text-sm"
+                    />
+                    <button type="button" onClick={() => setShowApiKey(!showApiKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
+                      {showApiKey ? '🙈' : '👁️'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Get $5 free credit at{' '}
+                    <a href="https://api.together.xyz" target="_blank" rel="noopener" className="text-orange-400 hover:underline">
+                      api.together.xyz
+                    </a>
+                  </p>
+                </div>
               </div>
             )}
 
