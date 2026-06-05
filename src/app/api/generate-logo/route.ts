@@ -41,14 +41,13 @@ async function tryTogetherAI(prompt: string, apiKey: string): Promise<{ image: s
 // Try generating with Hugging Face
 async function tryHuggingFace(prompt: string, apiKey: string): Promise<{ image: string; provider: string } | null> {
   const models = [
-    'stabilityai/stable-diffusion-xl-base-1.0',
     'black-forest-labs/FLUX.1-schnell',
-    'runwayml/stable-diffusion-v1-5',
+    'stabilityai/stable-diffusion-xl-base-1.0',
   ];
   for (const model of models) {
     try {
       console.log(`[HF] Trying model: ${model}`);
-      const res = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+      const res = await fetch(`https://router.huggingface.co/hf-inference/models/${model}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ inputs: prompt, parameters: { width: 512, height: 512 } }),
@@ -56,13 +55,19 @@ async function tryHuggingFace(prompt: string, apiKey: string): Promise<{ image: 
       });
       console.log(`[HF] ${model} response: ${res.status}`);
       if (res.ok) {
-        const blob = await res.arrayBuffer();
-        const b64 = Buffer.from(blob).toString('base64');
-        const ct = res.headers.get('content-type') || 'image/png';
-        return { image: `data:${ct};base64,${b64}`, provider: `huggingface/${model.split('/')[1]}` };
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('image')) {
+          const blob = await res.arrayBuffer();
+          const b64 = Buffer.from(blob).toString('base64');
+          return { image: `data:${contentType};base64,${b64}`, provider: `huggingface/${model.split('/')[1]}` };
+        }
+        // If not image, might be JSON error
+        const text = await res.text().catch(() => '');
+        console.log(`[HF] ${model} non-image response:`, text.slice(0, 200));
+      } else {
+        const errBody = await res.text().catch(() => '');
+        console.log(`[HF] ${model} error:`, errBody.slice(0, 200));
       }
-      const errBody = await res.text().catch(() => '');
-      console.log(`[HF] ${model} error:`, errBody.slice(0, 200));
     } catch (e: any) { 
       console.log(`[HF] ${model} exception:`, e?.message);
       continue; 
