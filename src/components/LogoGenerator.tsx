@@ -5,38 +5,16 @@ import { Industry, LogoVariant, ColorPalette, DesignPattern, LogoConfig } from '
 import { generateLogo, downloadSvg, downloadPng } from '@/lib/logoGenerator';
 import { ALL_PALETTES, getPaletteForIndustry } from '@/lib/colorPalettes';
 import { INDUSTRIES } from '@/lib/industries';
-import { ALL_PATTERNS, getPatternName } from '@/lib/patterns';
+import { ALL_PATTERNS } from '@/lib/patterns';
 import LogoPreview from './LogoPreview';
-
-const VARIANTS: { id: LogoVariant; label: string; desc: string }[] = [
-  { id: 'icon-only', label: 'Icon', desc: 'Standalone mark' },
-  { id: 'wordmark', label: 'Wordmark', desc: 'Icon + name' },
-  { id: 'stacked', label: 'Stacked', desc: 'Vertical layout' },
-  { id: 'horizontal', label: 'Horizontal', desc: 'Side by side' },
-];
+import { useLang } from '@/context/LanguageContext';
+import { TranslationKey } from '@/lib/i18n';
 
 // 6 styles from Nutlope/logocreator
 type AiStyle = 'tech' | 'flashy' | 'modern' | 'playful' | 'abstract' | 'minimal';
 
-const AI_STYLES: { id: AiStyle; label: string; desc: string }[] = [
-  { id: 'tech', label: 'Tech', desc: 'Clean, sleek, neutral' },
-  { id: 'flashy', label: 'Flashy', desc: 'Bold, neon, metallic' },
-  { id: 'modern', label: 'Modern', desc: 'Geometric, flat, strategic' },
-  { id: 'playful', label: 'Playful', desc: 'Bright, rounded, lively' },
-  { id: 'abstract', label: 'Abstract', desc: 'Artistic, unique, wild' },
-  { id: 'minimal', label: 'Minimal', desc: 'Simple, timeless, flat' },
-];
-
 // SVG styles for free mode
 type SvgStyle = 'minimal' | 'modern' | 'playful' | 'elegant' | 'bold';
-
-const SVG_STYLES: { id: SvgStyle; label: string; icon: string }[] = [
-  { id: 'minimal', label: 'Minimal', icon: '◇' },
-  { id: 'modern', label: 'Modern', icon: '⬡' },
-  { id: 'playful', label: 'Playful', icon: '◈' },
-  { id: 'elegant', label: 'Elegant', icon: '◆' },
-  { id: 'bold', label: 'Bold', icon: '■' },
-];
 
 // Color presets for AI mode
 const PRIMARY_COLORS = [
@@ -61,18 +39,7 @@ const BACKGROUND_COLORS = [
 
 type GenerationMode = 'free' | 'premium';
 
-// Simplified pattern labels for UMKM users (no technical jargon)
-const SIMPLE_PATTERN_NAMES: Record<DesignPattern, string> = {
-  'dot-matrix': 'Titik-Titik',
-  'geometric-shapes': 'Bentuk Geometris',
-  'line-system': 'Garis-Garis',
-  'node-network': 'Titik & Garis',
-  'dots-shapes': 'Titik dalam Bentuk',
-  'dots-lines': 'Titik & Koneksi',
-  'shapes-lines': 'Bentuk & Garis',
-};
-
-// UMKM example presets
+// UMKM example presets (brand names stay as-is — they're proper nouns)
 const UMKM_EXAMPLES = [
   { name: 'Warung Kopi', industry: 'cafe' as Industry, icon: '☕', color: '#8B4513' },
   { name: 'Villa Bali', industry: 'bali_tourism' as Industry, icon: '🌴', color: '#10B981' },
@@ -80,6 +47,8 @@ const UMKM_EXAMPLES = [
 ];
 
 export default function LogoGenerator() {
+  const { t } = useLang();
+
   const [brandName, setBrandName] = useState('');
   const [industry, setIndustry] = useState<Industry>('tech');
   const [svgStyle, setSvgStyle] = useState<SvgStyle>('modern');
@@ -106,6 +75,41 @@ export default function LogoGenerator() {
   const [aiImage, setAiImage] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+
+  // Derived translations
+  const VARIANTS: { id: LogoVariant; label: string; desc: string }[] = useMemo(() => [
+    { id: 'icon-only', label: t('var_icon'), desc: t('var_icon_desc') },
+    { id: 'wordmark', label: t('var_wordmark'), desc: t('var_wordmark_desc') },
+    { id: 'stacked', label: t('var_stacked'), desc: t('var_stacked_desc') },
+    { id: 'horizontal', label: t('var_horizontal'), desc: t('var_horizontal_desc') },
+  ], [t]);
+
+  const SVG_STYLES: { id: SvgStyle; label: string; icon: string }[] = useMemo(() => [
+    { id: 'minimal', label: t('style_minimal'), icon: '◇' },
+    { id: 'modern', label: t('style_modern'), icon: '⬡' },
+    { id: 'playful', label: t('style_playful'), icon: '◈' },
+    { id: 'elegant', label: t('style_elegant'), icon: '◆' },
+    { id: 'bold', label: t('style_bold'), icon: '■' },
+  ], [t]);
+
+  const AI_STYLES: { id: AiStyle; label: string; desc: string }[] = useMemo(() => [
+    { id: 'tech', label: t('ai_tech'), desc: t('ai_tech_desc') },
+    { id: 'flashy', label: t('ai_flashy'), desc: t('ai_flashy_desc') },
+    { id: 'modern', label: t('ai_modern'), desc: t('ai_modern_desc') },
+    { id: 'playful', label: t('ai_playful'), desc: t('ai_playful_desc') },
+    { id: 'abstract', label: t('ai_abstract'), desc: t('ai_abstract_desc') },
+    { id: 'minimal', label: t('ai_minimal'), desc: t('ai_minimal_desc') },
+  ], [t]);
+
+  const SIMPLE_PATTERN_NAMES: Record<DesignPattern, string> = useMemo(() => ({
+    'dot-matrix': t('pat_dot_matrix'),
+    'geometric-shapes': t('pat_geometric'),
+    'line-system': t('pat_line_system'),
+    'node-network': t('pat_node_network'),
+    'dots-shapes': t('pat_dots_shapes'),
+    'dots-lines': t('pat_dots_lines'),
+    'shapes-lines': t('pat_shapes_lines'),
+  }), [t]);
 
   // Load API keys from localStorage on mount
   useEffect(() => {
@@ -159,7 +163,7 @@ export default function LogoGenerator() {
       ...v,
       svg: generateLogo({ ...config, variant: v.id }),
     }));
-  }, [config]);
+  }, [config, VARIANTS]);
 
   // AI generation
   const handleAiGenerate = useCallback(async () => {
@@ -222,13 +226,13 @@ export default function LogoGenerator() {
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">Logo Generator</h1>
-          <p className="text-gray-400 mb-4">Buat logo gratis untuk bisnis Anda dalam hitungan detik</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">{t('gen_logo_generator')}</h1>
+          <p className="text-gray-400 mb-4">{t('gen_free_subtitle')}</p>
 
           {/* Free Logo Generator Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-sm font-medium text-emerald-300">Free Logo Generator</span>
+            <span className="text-sm font-medium text-emerald-300">{t('gen_free_badge')}</span>
           </div>
 
           {/* Mode Toggle */}
@@ -241,7 +245,7 @@ export default function LogoGenerator() {
                   : 'text-gray-400 hover:text-gray-300'
               }`}
             >
-              ✨ Gratis — SVG
+              {t('gen_free_tab')}
             </button>
             <button
               onClick={() => setMode('premium')}
@@ -251,14 +255,14 @@ export default function LogoGenerator() {
                   : 'text-gray-400 hover:text-gray-300'
               }`}
             >
-              🔥 Premium — AI
+              {t('gen_premium_tab')}
             </button>
           </div>
         </div>
 
         {/* UMKM Quick Examples */}
         <div className="mb-8 flex flex-wrap justify-center gap-3">
-          <span className="text-sm text-gray-500 self-center">Contoh:</span>
+          <span className="text-sm text-gray-500 self-center">{t('gen_examples')}</span>
           {UMKM_EXAMPLES.map(ex => (
             <button
               key={ex.name}
@@ -278,16 +282,16 @@ export default function LogoGenerator() {
           {/* ===== Unified Controls Panel ===== */}
           <div className="lg:col-span-4">
             <div className="bg-gray-900/50 rounded-2xl border border-gray-800/50 p-6 space-y-6">
-              <h2 className="text-lg font-semibold text-white">Pengaturan Logo</h2>
+              <h2 className="text-lg font-semibold text-white">{t('gen_settings')}</h2>
 
               {/* Brand Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Nama Bisnis</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">{t('gen_brand_name')}</label>
                 <input
                   type="text"
                   value={brandName}
                   onChange={e => setBrandName(e.target.value)}
-                  placeholder="Contoh: Warung Kopi Senja"
+                  placeholder={t('gen_brand_placeholder')}
                   className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 transition-all"
                   maxLength={30}
                 />
@@ -295,7 +299,7 @@ export default function LogoGenerator() {
 
               {/* Industry */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Jenis Bisnis</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">{t('gen_industry')}</label>
                 <div className="grid grid-cols-2 gap-2">
                   {INDUSTRIES.map(ind => (
                     <button
@@ -316,7 +320,7 @@ export default function LogoGenerator() {
 
               {/* Layout */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Tata Letak</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">{t('gen_layout')}</label>
                 <div className="grid grid-cols-2 gap-2">
                   {VARIANTS.map(v => (
                     <button
@@ -337,7 +341,7 @@ export default function LogoGenerator() {
 
               {/* Style — different for Free vs Premium */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Gaya Desain</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">{t('gen_style')}</label>
                 {mode === 'free' ? (
                   <div className="flex gap-2">
                     {SVG_STYLES.map(s => (
@@ -378,7 +382,7 @@ export default function LogoGenerator() {
               {/* Color — different for Free vs Premium */}
               {mode === 'free' ? (
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Warna</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">{t('gen_color')}</label>
                   <div className="grid grid-cols-3 gap-2">
                     {ALL_PALETTES.map(p => (
                       <button
@@ -401,11 +405,11 @@ export default function LogoGenerator() {
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Warna</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">{t('gen_color')}</label>
                   <div className="grid grid-cols-2 gap-4">
                     {/* Primary Color */}
                     <div>
-                      <label className="block text-xs text-gray-400 mb-2">Warna Utama</label>
+                      <label className="block text-xs text-gray-400 mb-2">{t('gen_primary_color')}</label>
                       <div className="grid grid-cols-4 gap-1.5 mb-2">
                         {PRIMARY_COLORS.map(c => (
                           <button
@@ -437,7 +441,7 @@ export default function LogoGenerator() {
 
                     {/* Background Color */}
                     <div>
-                      <label className="block text-xs text-gray-400 mb-2">Warna Latar</label>
+                      <label className="block text-xs text-gray-400 mb-2">{t('gen_bg_color')}</label>
                       <div className="grid grid-cols-3 gap-1.5 mb-2">
                         {BACKGROUND_COLORS.map(c => (
                           <button
@@ -473,7 +477,7 @@ export default function LogoGenerator() {
               {/* Pattern — Free mode only */}
               {mode === 'free' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Pola Desain</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">{t('gen_pattern')}</label>
                   <div className="grid grid-cols-2 gap-2">
                     {ALL_PATTERNS.map(p => (
                       <button
@@ -496,12 +500,12 @@ export default function LogoGenerator() {
               {mode === 'premium' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Deskripsi Tambahan <span className="text-gray-500">(opsional)</span>
+                    {t('gen_desc_label')} <span className="text-gray-500">({t('gen_optional')})</span>
                   </label>
                   <textarea
                     value={additionalInfo}
                     onChange={e => setAdditionalInfo(e.target.value)}
-                    placeholder="Contoh: Gunakan ikon kopi, font yang elegan, kesan premium..."
+                    placeholder={t('gen_desc_placeholder')}
                     className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/30 transition-all resize-none"
                     rows={3}
                     maxLength={200}
@@ -514,22 +518,22 @@ export default function LogoGenerator() {
               {mode === 'premium' && (
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-3">
-                    🔑 API Keys
-                    <span className="ml-2 text-xs text-gray-500">(opsional — fallback gratis tersedia)</span>
+                    {t('gen_api_keys')}
+                    <span className="ml-2 text-xs text-gray-500">{t('gen_api_optional')}</span>
                   </label>
 
                   {/* Hugging Face Key (FREE) */}
                   <div className="mb-4">
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-xs font-medium text-green-400">🤗 Hugging Face</span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-green-500/20 text-green-300 rounded-full">GRATIS</span>
+                      <span className="text-xs font-medium text-green-400">{t('gen_hf_label')}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-green-500/20 text-green-300 rounded-full">{t('gen_hf_free')}</span>
                     </div>
                     <div className="relative">
                       <input
                         type={showHFKey ? 'text' : 'password'}
                         value={userHFKey}
                         onChange={e => handleHFKeyChange(e.target.value)}
-                        placeholder="hf_xxxxxxxx (token gratis)"
+                        placeholder="hf_xxxxxxxx"
                         className="w-full px-4 py-2.5 pr-10 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-green-500/50 focus:ring-1 focus:ring-green-500/30 transition-all text-sm"
                       />
                       <button type="button" onClick={() => setShowHFKey(!showHFKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
@@ -537,7 +541,7 @@ export default function LogoGenerator() {
                       </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Dapatkan token gratis di{' '}
+                      {t('gen_hf_help')}{' '}
                       <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener" className="text-green-400 hover:underline">
                         huggingface.co/settings/tokens
                       </a>
@@ -547,8 +551,8 @@ export default function LogoGenerator() {
                   {/* Together AI Key (Paid, $5 free credit) */}
                   <div className="mb-4">
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-xs font-medium text-orange-400">⚡ Together AI</span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-orange-500/20 text-orange-300 rounded-full">$5 GRATIS</span>
+                      <span className="text-xs font-medium text-orange-400">{t('gen_together_label')}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-orange-500/20 text-orange-300 rounded-full">{t('gen_together_free')}</span>
                     </div>
                     <div className="relative">
                       <input
@@ -563,7 +567,7 @@ export default function LogoGenerator() {
                       </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Dapatkan $5 kredit gratis di{' '}
+                      {t('gen_together_help')}{' '}
                       <a href="https://api.together.xyz" target="_blank" rel="noopener" className="text-orange-400 hover:underline">
                         api.together.xyz
                       </a>
@@ -573,8 +577,8 @@ export default function LogoGenerator() {
                   {/* Google AI Studio Key (FREE) */}
                   <div>
                     <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-xs font-medium text-blue-400">🔵 Google AI Studio</span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/20 text-blue-300 rounded-full">GRATIS</span>
+                      <span className="text-xs font-medium text-blue-400">{t('gen_google_label')}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/20 text-blue-300 rounded-full">{t('gen_google_free')}</span>
                     </div>
                     <div className="relative">
                       <input
@@ -589,7 +593,7 @@ export default function LogoGenerator() {
                       </button>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Dapatkan kunci gratis di{' '}
+                      {t('gen_google_help')}{' '}
                       <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" className="text-blue-400 hover:underline">
                         aistudio.google.com/apikey
                       </a>
@@ -607,15 +611,15 @@ export default function LogoGenerator() {
                 {/* SVG Preview — Bigger */}
                 <div className="bg-gray-900/50 rounded-2xl border border-gray-800/50 p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-white">Preview Logo</h3>
+                    <h3 className="text-lg font-semibold text-white">{t('gen_preview')}</h3>
                     <div className="flex gap-3">
                       <button onClick={handleDownloadSvg} className="flex items-center gap-2 px-5 py-2.5 bg-violet-600/20 border border-violet-500/30 rounded-xl text-sm font-medium text-violet-300 hover:bg-violet-600/30 transition-colors">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17v3a2 2 0 002 2h14a2 2 0 002-2v-3" /></svg>
-                        Download SVG
+                        {t('gen_download_svg')}
                       </button>
                       <button onClick={handleDownloadPng} className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white text-sm font-medium rounded-xl hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/25">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17v3a2 2 0 002 2h14a2 2 0 002-2v-3" /></svg>
-                        Download PNG
+                        {t('gen_download_png')}
                       </button>
                     </div>
                   </div>
@@ -631,7 +635,7 @@ export default function LogoGenerator() {
 
                 {/* All Variants */}
                 <div className="bg-gray-900/50 rounded-2xl border border-gray-800/50 p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Semua Varian</h3>
+                  <h3 className="text-lg font-semibold text-white mb-4">{t('gen_all_variants')}</h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {allVariants.map((v, i) => (
                       <button key={i} onClick={() => setVariant(v.id as LogoVariant)} className={`p-4 rounded-xl border transition-all ${variant === v.id ? 'border-violet-500/50 bg-violet-500/10' : 'border-gray-700/30 bg-gray-800/20 hover:border-gray-600/50'}`}>
@@ -646,11 +650,11 @@ export default function LogoGenerator() {
                 <div className="bg-gray-900/50 rounded-2xl border border-gray-800/50 p-5">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-sm font-medium text-white">Download Semua Varian</h4>
-                      <p className="text-xs text-gray-400 mt-0.5">Unduh 4 layout sekaligus dalam format SVG</p>
+                      <h4 className="text-sm font-medium text-white">{t('gen_download_all_title')}</h4>
+                      <p className="text-xs text-gray-400 mt-0.5">{t('gen_download_all_desc')}</p>
                     </div>
                     <button onClick={() => allVariants.forEach(v => downloadSvg(v.svg, `${brandName || 'logo'}-${v.id}`))} className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white text-sm font-medium rounded-xl hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/25">
-                      Download Semua SVG
+                      {t('gen_download_all_btn')}
                     </button>
                   </div>
                 </div>
@@ -660,13 +664,13 @@ export default function LogoGenerator() {
               <div className="bg-gray-900/50 rounded-2xl border border-gray-800/50 p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-white">Logo AI</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">Dibuat oleh AI — desain unik dan profesional</p>
+                    <h3 className="text-lg font-semibold text-white">{t('gen_ai_logo')}</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">{t('gen_ai_desc')}</p>
                   </div>
                   {aiImage && (
                     <button onClick={handleDownloadAi} className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-medium rounded-xl hover:from-amber-400 hover:to-orange-400 transition-all shadow-lg shadow-orange-500/25">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17v3a2 2 0 002 2h14a2 2 0 002-2v-3" /></svg>
-                      Download PNG (untuk WhatsApp)
+                      {t('gen_ai_download')}
                     </button>
                   )}
                 </div>
@@ -675,10 +679,10 @@ export default function LogoGenerator() {
                   {aiLoading ? (
                     <span className="flex items-center justify-center gap-2">
                       <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                      Sedang Membuat Logo...
+                      {t('gen_ai_loading')}
                     </span>
                   ) : (
-                    '🔥 Buat Logo dengan AI'
+                    t('gen_ai_btn')
                   )}
                 </button>
 
@@ -687,11 +691,11 @@ export default function LogoGenerator() {
                   {aiLoading ? (
                     <div className="text-center">
                       <div className="w-20 h-20 mx-auto mb-6 border-4 border-orange-500/30 border-t-orange-500 rounded-full animate-spin" />
-                      <p className="text-white text-lg font-medium mb-2">Sedang membuat logo Anda...</p>
-                      <p className="text-gray-400 text-sm">Proses ini membutuhkan waktu 10-20 detik</p>
+                      <p className="text-white text-lg font-medium mb-2">{t('gen_ai_loading_title')}</p>
+                      <p className="text-gray-400 text-sm">{t('gen_ai_loading_desc')}</p>
                       <div className="mt-4 flex items-center justify-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
-                        <span className="text-orange-300 text-sm">Generating...</span>
+                        <span className="text-orange-300 text-sm">{t('gen_ai_generating')}</span>
                       </div>
                     </div>
                   ) : aiImage ? (
@@ -699,13 +703,13 @@ export default function LogoGenerator() {
                   ) : aiError ? (
                     <div className="text-center">
                       <p className="text-red-400 text-sm mb-2">⚠️ {aiError}</p>
-                      <button onClick={handleAiGenerate} className="text-sm text-orange-300 hover:text-orange-200 underline">Coba lagi</button>
+                      <button onClick={handleAiGenerate} className="text-sm text-orange-300 hover:text-orange-200 underline">{t('gen_ai_retry')}</button>
                     </div>
                   ) : (
                     <div className="text-center">
                       <div className="text-6xl mb-4">🎨</div>
-                      <p className="text-gray-400 text-lg mb-2">Atur pengaturan brand Anda, lalu klik</p>
-                      <p className="text-orange-300 text-lg font-medium">&quot;Buat Logo dengan AI&quot;</p>
+                      <p className="text-gray-400 text-lg mb-2">{t('gen_ai_empty_title')}</p>
+                      <p className="text-orange-300 text-lg font-medium">{t('gen_ai_empty_btn')}</p>
                     </div>
                   )}
                 </div>
