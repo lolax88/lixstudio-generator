@@ -666,7 +666,7 @@ export default function LogoGenerator() {
 
                 {/* Portfolio CTA */}
                 <a
-                  href="https://lixstudio.netlify.app/"
+                  href="https://lixstudio.vercel.app"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group bg-gray-900/50 rounded-2xl border border-gray-800/50 p-5 flex items-center justify-between hover:border-violet-500/30 transition-all"
