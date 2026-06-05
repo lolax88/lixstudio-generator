@@ -132,6 +132,15 @@ export async function POST(req: NextRequest) {
     type Attempt = { label: string; fn: () => Promise<{ image: string; provider: string } | null> };
     const attempts: Attempt[] = [];
 
+    // Debug: log available env keys
+    const serverHFKeys = getEnvKeys('HF_TOKEN');
+    const serverGoogleKeys = getEnvKeys('GOOGLE_AI_KEY');
+    const serverTogetherKeys = getEnvKeys('TOGETHER_API_KEY');
+    console.log('[DEBUG] Server HF keys:', serverHFKeys.length > 0 ? 'Found ' + serverHFKeys.length : 'NONE');
+    console.log('[DEBUG] Server Google keys:', serverGoogleKeys.length > 0 ? 'Found ' + serverGoogleKeys.length : 'NONE');
+    console.log('[DEBUG] Server Together keys:', serverTogetherKeys.length > 0 ? 'Found ' + serverTogetherKeys.length : 'NONE');
+    console.log('[DEBUG] User keys - Together:', !!userAPIKey, 'HF:', !!userHFKey, 'Google:', !!userGoogleKey);
+
     // 1. User's Together AI key (BYOK)
     if (userAPIKey) {
       attempts.push({ label: 'user-together', fn: () => tryTogetherAI(prompt, userAPIKey) });
