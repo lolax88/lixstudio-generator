@@ -73,12 +73,13 @@ async function tryHuggingFace(prompt: string, apiKey: string): Promise<{ image: 
 
 // Try generating with Google AI Studio (Gemini)
 async function tryGoogleAI(prompt: string, apiKey: string): Promise<{ image: string; provider: string } | null> {
-  const models = ['gemini-2.0-flash-exp'];
+  const models = ['gemini-2.5-flash-image', 'gemini-3.1-flash-image'];
   for (const model of models) {
     try {
-      console.log(`[Google AI] Trying model: ${model}`);
+      const modelName = model.replace('models/', '');
+      console.log(`[Google AI] Trying model: ${modelName}`);
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -88,10 +89,10 @@ async function tryGoogleAI(prompt: string, apiKey: string): Promise<{ image: str
           }),
         }
       );
-      console.log(`[Google AI] ${model} response: ${res.status}`);
+      console.log(`[Google AI] ${modelName} response: ${res.status}`);
       if (!res.ok) {
         const errBody = await res.text().catch(() => '');
-        console.log(`[Google AI] ${model} error:`, errBody.slice(0, 200));
+        console.log(`[Google AI] ${modelName} error:`, errBody.slice(0, 200));
         continue;
       }
       const data = await res.json();
@@ -99,10 +100,10 @@ async function tryGoogleAI(prompt: string, apiKey: string): Promise<{ image: str
       for (const part of parts) {
         if (part.inlineData?.data) {
           const mime = part.inlineData.mimeType || 'image/png';
-          return { image: `data:${mime};base64,${part.inlineData.data}`, provider: `google-ai/${model}` };
+          return { image: `data:${mime};base64,${part.inlineData.data}`, provider: `google-ai/${modelName}` };
         }
       }
-      console.log(`[Google AI] ${model} no image in response`);
+      console.log(`[Google AI] ${modelName} no image in response`);
     } catch (e: any) { 
       console.log(`[Google AI] ${model} exception:`, e?.message);
       continue; 
