@@ -1,6 +1,11 @@
+'use client';
+
 import Link from 'next/link';
+import { useLang } from '@/context/LanguageContext';
 
 export default function Footer() {
+  const { t, lang } = useLang();
+
   return (
     <footer className="border-t border-gray-800/50 bg-gray-950">
       <div className="max-w-7xl mx-auto px-4 py-12">
@@ -17,36 +22,36 @@ export default function Footer() {
               <span className="text-lg font-bold text-white">LixStudio</span>
             </Link>
             <p className="text-sm text-gray-500">
-              Professional SVG logo generation powered by algorithmic design patterns.
+              {t('footer_desc')}
             </p>
           </div>
           <div>
-            <h4 className="text-sm font-semibold text-white mb-3">Product</h4>
+            <h4 className="text-sm font-semibold text-white mb-3">{t('footer_product')}</h4>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li><Link href="/generator" className="hover:text-white transition-colors">Logo Generator</Link></li>
-              <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-              <li><a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a></li>
+              <li><Link href="/generator" className="hover:text-white transition-colors">{t('footer_logo_gen')}</Link></li>
+              <li><a href="#pricing" className="hover:text-white transition-colors">{t('nav_pricing')}</a></li>
+              <li><a href="#how-it-works" className="hover:text-white transition-colors">{t('hiw_label')}</a></li>
             </ul>
           </div>
           <div>
-            <h4 className="text-sm font-semibold text-white mb-3">Resources</h4>
+            <h4 className="text-sm font-semibold text-white mb-3">{t('footer_resources')}</h4>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li><a href="#faq" className="hover:text-white transition-colors">FAQ</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Design Guide</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">API Docs</a></li>
+              <li><a href="#faq" className="hover:text-white transition-colors">{t('faq_label')}</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">{t('footer_design_guide')}</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">{t('footer_api_docs')}</a></li>
             </ul>
           </div>
           <div>
-            <h4 className="text-sm font-semibold text-white mb-3">Company</h4>
+            <h4 className="text-sm font-semibold text-white mb-3">{t('footer_company')}</h4>
             <ul className="space-y-2 text-sm text-gray-400">
-              <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Privacy</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Terms</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">{t('footer_about')}</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">{t('footer_privacy')}</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">{t('footer_terms')}</a></li>
             </ul>
           </div>
         </div>
         <div className="border-t border-gray-800/50 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-gray-500">&copy; 2026 LixStudio. All rights reserved.</p>
+          <p className="text-xs text-gray-500">&copy; 2026 LixStudio. {t('footer_copy')}</p>
           <div className="flex items-center gap-4">
             <a href="#" className="text-gray-500 hover:text-white transition-colors">
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/></svg>

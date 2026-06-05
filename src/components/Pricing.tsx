@@ -1,53 +1,59 @@
+'use client';
+
+import { useLang } from '@/context/LanguageContext';
+
 export default function Pricing() {
+  const { t, lang } = useLang();
+
   const plans = [
     {
-      name: 'Free',
+      name: t('pricing_free'),
       price: '$0',
-      period: 'forever',
-      description: 'Perfect for trying out logo generation',
+      period: lang === 'id' ? 'selamanya' : 'forever',
+      description: t('pricing_free_desc'),
       features: [
-        '5 logo generations per day',
-        '3 design patterns',
-        'SVG download',
-        'Basic color palettes',
-        'Icon-only variant',
+        t('pricing_free_f1'),
+        t('pricing_free_f2'),
+        t('pricing_free_f3'),
+        t('pricing_free_f4'),
+        t('pricing_free_f5'),
       ],
-      cta: 'Get Started Free',
+      cta: t('pricing_free_cta'),
       popular: false,
     },
     {
-      name: 'Pro',
+      name: t('pricing_pro'),
       price: '$19',
-      period: '/month',
-      description: 'For freelancers and small businesses',
+      period: lang === 'id' ? '/bulan' : '/month',
+      description: t('pricing_pro_desc'),
       features: [
-        'Unlimited logo generations',
-        'All 7 design patterns',
-        'SVG + PNG download',
-        'All color palettes',
-        'All 4 layout variants',
-        'Custom color input',
-        'Priority generation',
+        t('pricing_pro_f1'),
+        t('pricing_pro_f2'),
+        t('pricing_pro_f3'),
+        t('pricing_pro_f4'),
+        t('pricing_pro_f5'),
+        t('pricing_pro_f6'),
+        t('pricing_pro_f7'),
       ],
-      cta: 'Start Pro Trial',
+      cta: t('pricing_pro_cta'),
       popular: true,
     },
     {
-      name: 'Enterprise',
+      name: t('pricing_ent'),
       price: '$49',
-      period: '/month',
-      description: 'For agencies and design teams',
+      period: lang === 'id' ? '/bulan' : '/month',
+      description: t('pricing_ent_desc'),
       features: [
-        'Everything in Pro',
-        'Brand kit management',
-        'Batch generation (10+ logos)',
-        'White-label exports',
-        'API access',
-        'Team collaboration',
-        'Dedicated support',
-        'Custom design patterns',
+        t('pricing_ent_f1'),
+        t('pricing_ent_f2'),
+        t('pricing_ent_f3'),
+        t('pricing_ent_f4'),
+        t('pricing_ent_f5'),
+        t('pricing_ent_f6'),
+        t('pricing_ent_f7'),
+        t('pricing_ent_f8'),
       ],
-      cta: 'Contact Sales',
+      cta: t('pricing_ent_cta'),
       popular: false,
     },
   ];
@@ -57,12 +63,12 @@ export default function Pricing() {
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-violet-950/10 to-transparent" />
       <div className="max-w-6xl mx-auto relative z-10">
         <div className="text-center mb-16">
-          <span className="text-sm text-violet-400 font-medium tracking-wider uppercase">Pricing</span>
+          <span className="text-sm text-violet-400 font-medium tracking-wider uppercase">{t('pricing_label')}</span>
           <h2 className="text-3xl sm:text-4xl font-bold text-white mt-3 mb-4">
-            Simple, Transparent Pricing
+            {t('pricing_title')}
           </h2>
           <p className="text-gray-400 max-w-xl mx-auto">
-            Start free, upgrade when you need more. No hidden fees.
+            {t('pricing_desc')}
           </p>
         </div>
 
@@ -79,7 +85,7 @@ export default function Pricing() {
               {plan.popular && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <span className="px-3 py-1 bg-gradient-to-r from-violet-600 to-purple-600 text-white text-xs font-bold rounded-full">
-                    Most Popular
+                    {t('pricing_popular')}
                   </span>
                 </div>
               )}

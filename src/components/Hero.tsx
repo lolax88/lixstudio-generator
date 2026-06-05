@@ -1,8 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { useLang } from '@/context/LanguageContext';
 
 export default function Hero() {
+  const { t } = useLang();
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
       {/* Animated background gradient */}
@@ -25,21 +28,21 @@ export default function Hero() {
         {/* Badge */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 mb-8">
           <span className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
-          <span className="text-sm text-emerald-300 font-medium">✨ Gratis — Langsung Pakai</span>
+          <span className="text-sm text-emerald-300 font-medium">{t('hero_badge')}</span>
         </div>
 
         {/* Main heading */}
         <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
-          <span className="text-white">Create Stunning</span>
+          <span className="text-white">{t('hero_title_1')}</span>
           <br />
           <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-blue-400 bg-clip-text text-transparent">
-            Logos Instantly
+            {t('hero_title_2')}
           </span>
         </h1>
 
         <p className="text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-          Buat logo profesional untuk bisnis Anda dalam hitungan detik.
-          <span className="text-gray-300 font-medium"> Gratis, tanpa perlu keahlian desain.</span>
+          {t('hero_desc')}{' '}
+          <span className="text-gray-300 font-medium">{t('hero_desc_bold')}</span>
         </p>
 
         {/* CTA buttons */}
@@ -48,13 +51,13 @@ export default function Hero() {
             href="/generator"
             className="px-8 py-3.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white font-semibold rounded-xl hover:from-violet-500 hover:to-purple-500 transition-all shadow-xl shadow-violet-500/25 text-lg"
           >
-            Buat Logo — Gratis
+            {t('hero_cta')}
           </Link>
           <a
             href="#how-it-works"
             className="px-8 py-3.5 border border-gray-700 text-gray-300 font-medium rounded-xl hover:bg-gray-800/50 hover:border-gray-600 transition-all"
           >
-            Lihat Cara Kerjanya
+            {t('hero_cta_2')}
           </a>
         </div>
 

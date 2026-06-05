@@ -3,12 +3,12 @@ import LogoGenerator from '@/components/LogoGenerator';
 import Footer from '@/components/Footer';
 
 export const metadata = {
-  title: 'Create Your Logo — LixStudio Logo Generator',
+  title: 'Generator Logo — LixStudio',
   description:
-    'Design and download professional SVG logos. Choose your industry, colors, style, and pattern. Export as SVG or PNG.',
+    'Buat dan unduh logo profesional. Pilih industri, warna, gaya, dan pola. Ekspor sebagai SVG atau PNG.',
   openGraph: {
-    title: 'Create Your Logo — LixStudio Logo Generator',
-    description: 'Design and download professional SVG logos. Export as SVG or PNG.',
+    title: 'Generator Logo — LixStudio',
+    description: 'Buat logo profesional untuk bisnis Anda. Gratis!',
   },
 };
 
