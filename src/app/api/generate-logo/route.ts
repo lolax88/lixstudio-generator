@@ -41,8 +41,9 @@ async function tryTogetherAI(prompt: string, apiKey: string): Promise<{ image: s
 // Try generating with Hugging Face
 async function tryHuggingFace(prompt: string, apiKey: string): Promise<{ image: string; provider: string } | null> {
   const models = [
-    'black-forest-labs/FLUX.1-schnell',
     'stabilityai/stable-diffusion-xl-base-1.0',
+    'black-forest-labs/FLUX.1-schnell',
+    'runwayml/stable-diffusion-v1-5',
   ];
   for (const model of models) {
     try {
@@ -50,7 +51,8 @@ async function tryHuggingFace(prompt: string, apiKey: string): Promise<{ image: 
       const res = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ inputs: prompt, parameters: { width: 1024, height: 1024 } }),
+        body: JSON.stringify({ inputs: prompt, parameters: { width: 512, height: 512 } }),
+        signal: AbortSignal.timeout(30000),
       });
       console.log(`[HF] ${model} response: ${res.status}`);
       if (res.ok) {
@@ -71,7 +73,7 @@ async function tryHuggingFace(prompt: string, apiKey: string): Promise<{ image: 
 
 // Try generating with Google AI Studio (Gemini)
 async function tryGoogleAI(prompt: string, apiKey: string): Promise<{ image: string; provider: string } | null> {
-  const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+  const models = ['gemini-2.0-flash-preview-image-generation', 'gemini-2.0-flash-exp'];
   for (const model of models) {
     try {
       console.log(`[Google AI] Trying model: ${model}`);
