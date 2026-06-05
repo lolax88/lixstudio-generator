@@ -29,27 +29,32 @@ export async function GET() {
   // Test Google AI
   const googleKey = process.env.GOOGLE_AI_KEY;
   if (googleKey) {
-    try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${googleKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: 'Generate a simple logo' }] }],
-            generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
-          }),
-        }
-      );
-      const data = await res.json().catch(() => ({}));
-      results.google = {
-        status: res.status,
-        ok: res.ok,
-        hasImage: data?.candidates?.[0]?.content?.parts?.some((p: any) => p.inlineData),
-        error: data?.error?.message,
-      };
-    } catch (e: any) {
-      results.google = { error: e?.message };
+    const models = ['gemini-2.0-flash-preview-image-generation', 'gemini-2.0-flash-exp'];
+    for (const model of models) {
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${googleKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: 'Generate a simple logo' }] }],
+              generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+            }),
+          }
+        );
+        const data = await res.json().catch(() => ({}));
+        results.google = {
+          model,
+          status: res.status,
+          ok: res.ok,
+          hasImage: data?.candidates?.[0]?.content?.parts?.some((p: any) => p.inlineData),
+          error: data?.error?.message,
+        };
+        if (res.ok) break;
+      } catch (e: any) {
+        results.google = { model, error: e?.message };
+      }
     }
   } else {
     results.google = { error: 'No GOOGLE_AI_KEY' };
