@@ -33,7 +33,7 @@ export async function GET() {
     for (const model of models) {
       try {
         const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${googleKey}`,
+          `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${googleKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
