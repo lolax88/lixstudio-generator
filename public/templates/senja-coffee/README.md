@@ -1,0 +1,1 @@
+# Senja Coffee Logo Templates
