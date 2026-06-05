@@ -124,6 +124,45 @@ async function tryPollinations(prompt: string): Promise<{ image: string; provide
   } catch { return null; }
 }
 
+// Try generating with Replicate (Flux Schnell) - $5 free credit
+async function tryReplicate(prompt: string, apiKey: string): Promise<{ image: string; provider: string } | null> {
+  try {
+    console.log('[Replicate] Starting prediction...');
+    const res = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'wait',
+      },
+      body: JSON.stringify({
+        input: { prompt, num_outputs: 1, aspect_ratio: '1:1', output_format: 'png' },
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+    console.log('[Replicate] response:', res.status);
+    if (!res.ok) {
+      const err = await res.text().catch(() => '');
+      console.log('[Replicate] error:', err.slice(0, 200));
+      return null;
+    }
+    const data = await res.json();
+    const output = data.output?.[0] || data.output;
+    if (output && typeof output === 'string') {
+      const imgRes = await fetch(output);
+      if (imgRes.ok) {
+        const blob = await imgRes.arrayBuffer();
+        const b64 = Buffer.from(blob).toString('base64');
+        return { image: `data:image/png;base64,${b64}`, provider: 'replicate/flux-schnell' };
+      }
+    }
+    return null;
+  } catch (e: any) {
+    console.log('[Replicate] exception:', e?.message);
+    return null;
+  }
+}
+
 // Collect all available keys from env (supports HF_TOKEN, HF_TOKEN_2, HF_TOKEN_3, etc.)
 function getEnvKeys(prefix: string): string[] {
   const keys: string[] = [];
@@ -193,7 +232,12 @@ export async function POST(req: NextRequest) {
       attempts.push({ label: `server-google-${key.slice(-4)}`, fn: () => tryGoogleAI(prompt, key) });
     }
 
-    // 6. Pollinations.ai (free, no key)
+    // 6. Server Replicate keys (REPLICATE_API_TOKEN, REPLICATE_API_TOKEN_2, ...)
+    for (const key of getEnvKeys('REPLICATE_API_TOKEN')) {
+      attempts.push({ label: `server-replicate-${key.slice(-4)}`, fn: () => tryReplicate(prompt, key) });
+    }
+
+    // 7. Pollinations.ai (free, no key)
     attempts.push({ label: 'pollinations', fn: () => tryPollinations(prompt) });
 
     // Execute fallback chain

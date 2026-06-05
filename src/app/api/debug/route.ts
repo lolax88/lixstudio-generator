@@ -73,5 +73,35 @@ export async function GET() {
     results.pollinations = { error: e?.message };
   }
 
+  // Test Replicate
+  const replicateKey = process.env.REPLICATE_API_TOKEN;
+  if (replicateKey) {
+    try {
+      const res = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${replicateKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'wait',
+        },
+        body: JSON.stringify({
+          input: { prompt: 'a simple logo', num_outputs: 1, aspect_ratio: '1:1', output_format: 'png' },
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+      const data = await res.json().catch(() => ({}));
+      results.replicate = {
+        status: res.status,
+        ok: res.ok,
+        hasOutput: !!data.output,
+        error: data?.error || data?.detail,
+      };
+    } catch (e: any) {
+      results.replicate = { error: e?.message };
+    }
+  } else {
+    results.replicate = { error: 'No REPLICATE_API_TOKEN' };
+  }
+
   return NextResponse.json(results, { status: 200 });
 }
