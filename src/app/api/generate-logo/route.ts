@@ -62,7 +62,6 @@ async function tryHuggingFace(prompt: string, apiKey: string): Promise<{ image: 
   return null;
 }
 
-// Try generating with Pollinations.ai (free, no key)
 // Try generating with Google AI Studio (Gemini 2.0 Flash)
 async function tryGoogleAI(prompt: string, apiKey: string): Promise<{ image: string; provider: string } | null> {
   try {
