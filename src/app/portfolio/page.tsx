@@ -1,112 +1,59 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useLang } from '@/context/LanguageContext';
 
-// Template data — replace with real logos later
-const TEMPLATES = [
-  {
-    category: 'Warung Kopi',
-    icon: '☕',
-    categoryEn: 'Coffee Shop',
-    items: [
-      { name: 'Kopi Pagi', color: '#5C3D2E', pattern: 'geometric-shapes' },
-      { name: 'Senja Coffee', color: '#D4712A', pattern: 'line-system' },
-      { name: 'Kedai Nusantara', color: '#2D5A3D', pattern: 'dot-matrix' },
-      { name: 'Roast House', color: '#0D0D0D', pattern: 'node-network' },
-    ],
-  },
+// Warung Kopi — real logos
+const WARUNGKOPI = [
+  { name: 'Kopi Pagi', src: '/templates/kopi-pagi/kopi-pagi-icon.png', desc: 'Paper cup + steam, minimalis modern', descEn: 'Paper cup + steam, minimalist modern' },
+  { name: 'Roast House', src: '/templates/roast-house/roasthouse-wordmark.png', desc: 'Custom typography, pure wordmark', descEn: 'Custom typography, pure wordmark' },
+  { name: 'Senja Coffee', src: '/templates/senja-coffee/senja-coffee-icon.png', desc: 'Sunset icon, bold & elegant', descEn: 'Sunset icon, bold & elegant' },
+  { name: 'Kedai Nusantara', src: '/templates/kedai-nusantara/kedai-nusantara-icon.png', desc: 'Cup kertas + motif daun, budaya Indonesia', descEn: 'Paper cup + leaf motif, Indonesian heritage' },
+];
+
+// Placeholder categories — will be replaced with real logos later
+const PLACEHOLDER_CATS = [
   {
     category: 'Villa & Bali Tourism',
-    icon: '🌴',
     categoryEn: 'Villa & Tourism',
-    items: [
-      { name: 'Villa Indah', color: '#0D9488', pattern: 'dot-matrix' },
-      { name: 'Bali Retreat', color: '#B8860B', pattern: 'geometric-shapes' },
-      { name: 'Sunset Villa', color: '#E07A5F', pattern: 'line-system' },
-      { name: 'Tropis Stay', color: '#52B788', pattern: 'node-network' },
-    ],
+    icon: '🌴',
+    color: '#0D9488',
+    items: ['Villa Indah', 'Bali Retreat', 'Sunset Villa', 'Tropis Stay'],
   },
   {
     category: 'Rental Motor',
-    icon: '🛵',
     categoryEn: 'Motor Rental',
-    items: [
-      { name: 'Ride Bali', color: '#1E88E5', pattern: 'node-network' },
-      { name: 'MotoRent', color: '#E53935', pattern: 'geometric-shapes' },
-      { name: 'Bali Wheels', color: '#43A047', pattern: 'dot-matrix' },
-      { name: 'GoRide', color: '#FF6D00', pattern: 'line-system' },
-    ],
+    icon: '🛵',
+    color: '#1E88E5',
+    items: ['Ride Bali', 'MotoRent', 'Bali Wheels', 'GoRide'],
   },
   {
     category: 'Fashion & Beauty',
-    icon: '👗',
     categoryEn: 'Fashion & Beauty',
-    items: [
-      { name: 'Luxe Beauty', color: '#B76E79', pattern: 'dot-matrix' },
-      { name: 'Studio Mode', color: '#0D0D0D', pattern: 'line-system' },
-      { name: 'Glow Skin', color: '#9575CD', pattern: 'geometric-shapes' },
-      { name: 'Batik Modern', color: '#6D4C41', pattern: 'node-network' },
-    ],
+    icon: '👗',
+    color: '#B76E79',
+    items: ['Luxe Beauty', 'Studio Mode', 'Glow Skin', 'Batik Modern'],
   },
   {
     category: 'Tech & Startup',
-    icon: '💻',
     categoryEn: 'Tech & Startup',
-    items: [
-      { name: 'ByteLab', color: '#00B0FF', pattern: 'node-network' },
-      { name: 'CloudSync', color: '#7C3AED', pattern: 'geometric-shapes' },
-      { name: 'PixelCraft', color: '#00E676', pattern: 'dot-matrix' },
-      { name: 'LaunchPad', color: '#FF6D00', pattern: 'line-system' },
-    ],
+    icon: '💻',
+    color: '#00B0FF',
+    items: ['ByteLab', 'CloudSync', 'PixelCraft', 'LaunchPad'],
   },
 ];
 
-// Simple SVG demo icons for showcase (will be replaced with real templates)
-function DemoLogo({ color, pattern }: { color: string; pattern: string }) {
-  const patterns: Record<string, React.ReactNode> = {
-    'dot-matrix': (
-      <g fill={color}>
-        {[0, 1, 2, 3, 4, 5].map(i => {
-          const angle = (2 * Math.PI * i) / 6 - Math.PI / 2;
-          return <circle key={i} cx={50 + 18 * Math.cos(angle)} cy={50 + 18 * Math.sin(angle)} r="4" />;
-        })}
-        <circle cx="50" cy="50" r="3" />
-      </g>
-    ),
-    'geometric-shapes': (
-      <g fill="none" stroke={color} strokeWidth="2">
-        <circle cx="38" cy="50" r="18" />
-        <circle cx="62" cy="50" r="18" />
-        <circle cx="50" cy="35" r="18" />
-      </g>
-    ),
-    'line-system': (
-      <g fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
-        <path d="M 20 50 Q 35 30, 50 50 T 80 50" />
-        <path d="M 20 50 Q 35 40, 50 50 T 80 50" opacity="0.5" transform="translate(0,-8)" />
-        <path d="M 20 50 Q 35 44, 50 50 T 80 50" opacity="0.3" transform="translate(0,8)" />
-      </g>
-    ),
-    'node-network': (
-      <g stroke={color} strokeWidth="2" fill="none">
-        <path d="M 30 70 Q 50 70, 50 50 Q 50 30, 70 30" />
-        <circle cx="30" cy="70" r="5" fill={color} />
-        <circle cx="50" cy="50" r="6" fill={color} />
-        <circle cx="70" cy="30" r="5" fill={color} />
-      </g>
-    ),
-  };
-
+function PlaceholderLogo({ color, name }: { color: string; name: string }) {
   return (
-    <svg viewBox="0 0 100 100" className="w-16 h-16">
-      {patterns[pattern] || patterns['dot-matrix']}
-    </svg>
+    <div className="flex items-center justify-center w-20 h-20 mx-auto rounded-xl bg-gray-800/50 border border-gray-700/50">
+      <span className="text-2xl font-bold" style={{ color }}>{name.charAt(0)}</span>
+    </div>
   );
 }
 
 export default function PortfolioPage() {
-  const { t, lang } = useLang();
+  const { lang } = useLang();
 
   return (
     <main className="bg-gray-950 min-h-screen">
@@ -141,35 +88,73 @@ export default function PortfolioPage() {
         </div>
       </section>
 
-      {/* Template Gallery */}
-      <section id="templates" className="pb-24 px-4">
-        <div className="max-w-6xl mx-auto space-y-16">
-          {TEMPLATES.map((cat, ci) => (
-            <div key={ci}>
-              <div className="flex items-center gap-3 mb-6">
-                <span className="text-2xl">{cat.icon}</span>
-                <h2 className="text-2xl font-bold text-white">
-                  {lang === 'id' ? cat.category : cat.categoryEn}
-                </h2>
+      {/* Warung Kopi — REAL LOGOS */}
+      <section id="templates" className="pb-16 px-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="text-2xl">☕</span>
+            <h2 className="text-2xl font-bold text-white">
+              {lang === 'id' ? 'Warung Kopi' : 'Coffee Shop'}
+            </h2>
+            <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">
+              {lang === 'id' ? 'Selesai' : 'Done'}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {WARUNGKOPI.map((item, i) => (
+              <div
+                key={i}
+                className="group bg-gray-900/50 backdrop-blur-sm rounded-2xl border border-gray-800/50 p-6 hover:border-violet-500/30 transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+              >
+                <div className="relative w-full aspect-square mx-auto mb-4 rounded-xl overflow-hidden bg-white/5 border border-gray-700/50 group-hover:border-violet-500/30 transition-colors">
+                  <Image
+                    src={item.src}
+                    alt={item.name}
+                    fill
+                    className="object-contain p-2"
+                    unoptimized
+                  />
+                </div>
+                <p className="text-sm font-medium text-white text-center">{item.name}</p>
+                <p className="text-xs text-gray-500 text-center mt-1">
+                  {lang === 'id' ? item.desc : item.descEn}
+                </p>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {cat.items.map((item, ii) => (
-                  <div
-                    key={ii}
-                    className="group bg-gray-900/50 backdrop-blur-sm rounded-2xl border border-gray-800/50 p-6 hover:border-violet-500/30 transition-all duration-300 hover:-translate-y-1 cursor-pointer"
-                  >
-                    <div className="flex items-center justify-center w-20 h-20 mx-auto mb-4 rounded-xl bg-gray-800/50 border border-gray-700/50 group-hover:border-violet-500/30 transition-colors">
-                      <DemoLogo color={item.color} pattern={item.pattern} />
-                    </div>
-                    <p className="text-sm font-medium text-white text-center">{item.name}</p>
-                    <p className="text-xs text-gray-500 text-center mt-1">{item.pattern}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
+
+      {/* Placeholder categories */}
+      {PLACEHOLDER_CATS.map((cat, ci) => (
+        <section key={ci} className="pb-16 px-4">
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-center gap-3 mb-6">
+              <span className="text-2xl">{cat.icon}</span>
+              <h2 className="text-2xl font-bold text-white">
+                {lang === 'id' ? cat.category : cat.categoryEn}
+              </h2>
+              <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full">
+                {lang === 'id' ? 'Segera' : 'Coming Soon'}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {cat.items.map((name, ii) => (
+                <div
+                  key={ii}
+                  className="group bg-gray-900/50 backdrop-blur-sm rounded-2xl border border-gray-800/50 p-6 opacity-60"
+                >
+                  <PlaceholderLogo color={cat.color} name={name} />
+                  <p className="text-sm font-medium text-white text-center mt-4">{name}</p>
+                  <p className="text-xs text-gray-500 text-center mt-1">
+                    {lang === 'id' ? 'Segera hadir' : 'Coming soon'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ))}
 
       {/* CTA */}
       <section className="pb-24 px-4">
