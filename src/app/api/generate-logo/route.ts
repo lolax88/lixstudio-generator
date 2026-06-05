@@ -1,32 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Style prompts adapted from Nutlope/logocreator + LixStudio brand
+// 6 Style prompts adapted from Nutlope/logocreator
 const STYLE_PROMPTS: Record<string, string> = {
-  minimal:
-    'minimal, simple, timeless, versatile, single color logo, use negative space, flat design with minimal details, light, soft, and subtle.',
+  tech:
+    'highly detailed, sharp focus, cinematic, photorealistic, minimalist, clean, sleek, neutral color palette with subtle accents, clean lines, shadows, and flat.',
+  flashy:
+    'flashy, attention grabbing, bold, futuristic, and eye-catching. Use vibrant neon colors with metallic, shiny, and glossy accents.',
   modern:
     'modern, forward-thinking, flat design, geometric shapes, clean lines, natural colors with subtle accents, use strategic negative space to create visual interest.',
   playful:
     'playful, lighthearted, bright bold colors, rounded shapes, lively, fun, approachable.',
-  elegant:
-    'elegant, sophisticated, refined, luxury feel, serif typography hints, gold or silver accents, premium quality.',
-  bold: 'bold, attention grabbing, futuristic, eye-catching, vibrant colors with metallic, shiny, and glossy accents, strong presence.',
+  abstract:
+    'abstract, artistic, creative, unique shapes, patterns, and textures to create a visually interesting and wild logo.',
+  minimal:
+    'minimal, simple, timeless, versatile, single color logo, use negative space, flat design with minimal details, light, soft, and subtle.',
 };
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { brandName, industry, style, primaryColor, secondaryColor, additionalInfo } = body;
+    const {
+      userAPIKey,
+      brandName,
+      industry,
+      style,
+      primaryColor,
+      backgroundColor,
+      additionalInfo,
+    } = body;
 
     if (!brandName) {
       return NextResponse.json({ error: 'Brand name is required' }, { status: 400 });
     }
 
-    const apiKey = process.env.TOGETHER_API_KEY;
+    // BYOK: use user's API key if provided, otherwise use server key
+    const apiKey = userAPIKey || process.env.TOGETHER_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'AI generation not configured. Set TOGETHER_API_KEY.' },
-        { status: 503 }
+        { error: 'No API key. Enter your Together AI key or contact support.' },
+        { status: 403 }
       );
     }
 
@@ -34,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     const prompt = `A single logo, high-quality, award-winning professional design, made for both digital and print media, only contains a few vector shapes, ${stylePrompt}
 
-Primary color is ${primaryColor} and secondary color is ${secondaryColor}. The company name is "${brandName}", make sure to include the company name in the logo. Industry: ${industry}. ${additionalInfo ? `Additional info: ${additionalInfo}` : ''}`;
+Primary color is ${primaryColor} and background color is ${backgroundColor}. The company name is "${brandName}", make sure to include the company name in the logo. Industry: ${industry}. ${additionalInfo ? `Additional info: ${additionalInfo}` : ''}`;
 
     const response = await fetch(
       'https://api.together.xyz/v1/images/generations',
@@ -59,6 +71,14 @@ Primary color is ${primaryColor} and secondary color is ${secondaryColor}. The c
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Together AI error:', errorText);
+
+      if (response.status === 401) {
+        return NextResponse.json(
+          { error: 'Invalid API key. Check your Together AI key.' },
+          { status: 401 }
+        );
+      }
+
       return NextResponse.json(
         { error: 'AI generation failed. Please try again.' },
         { status: 502 }
