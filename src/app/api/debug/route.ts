@@ -29,7 +29,7 @@ export async function GET() {
   // Test Google AI
   const googleKey = process.env.GOOGLE_AI_KEY;
   if (googleKey) {
-    const models = ['gemini-2.0-flash-preview-image-generation', 'gemini-2.0-flash-exp'];
+    const models = ['gemini-2.0-flash-preview-image-generation'];
     for (const model of models) {
       try {
         const res = await fetch(
