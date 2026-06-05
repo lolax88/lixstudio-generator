@@ -6,20 +6,20 @@ import FAQ from '@/components/FAQ';
 import Footer from '@/components/Footer';
 
 export const metadata = {
-  title: 'LixStudio Logo Generator — Create Professional SVG Logos Instantly',
+  title: 'LixStudio — Buat Logo Gratis, Langsung Pakai',
   description:
-    'Generate stunning, unique SVG logos using advanced geometric patterns, dot matrices, and node networks. No design skills needed. Free to start.',
-  keywords: 'logo generator, SVG logo, design tool, brand identity, geometric logo, dot matrix',
+    'Buat logo profesional untuk bisnis Anda dalam hitungan detik. Gratis, tanpa perlu keahlian desain. Cocok untuk UMKM, warung kopi, villa, dan usaha kecil.',
+  keywords: 'logo generator, buat logo gratis, desain logo UMKM, logo bisnis kecil, logo warung kopi, logo villa bali',
   openGraph: {
-    title: 'LixStudio Logo Generator',
-    description: 'Create stunning SVG logos with advanced geometric patterns. Free to start.',
+    title: 'LixStudio — Buat Logo Gratis',
+    description: 'Buat logo profesional untuk bisnis Anda dalam hitungan detik. Gratis!',
     type: 'website',
-    locale: 'en_US',
+    locale: 'id_ID',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'LixStudio Logo Generator',
-    description: 'Create stunning SVG logos with advanced geometric patterns.',
+    title: 'LixStudio — Buat Logo Gratis',
+    description: 'Buat logo profesional untuk bisnis Anda dalam hitungan detik. Gratis!',
   },
 };
 

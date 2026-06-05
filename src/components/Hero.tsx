@@ -25,7 +25,7 @@ export default function Hero() {
         {/* Badge */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 mb-8">
           <span className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
-          <span className="text-sm text-violet-300 font-medium">AI-Powered Logo Design</span>
+          <span className="text-sm text-emerald-300 font-medium">✨ Gratis — Langsung Pakai</span>
         </div>
 
         {/* Main heading */}
