@@ -665,8 +665,10 @@ export default function LogoGenerator() {
                 </div>
 
                 {/* Portfolio CTA */}
-                <Link
-                  href="/portfolio"
+                <a
+                  href="https://lixstudio.netlify.app/"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="group bg-gray-900/50 rounded-2xl border border-gray-800/50 p-5 flex items-center justify-between hover:border-violet-500/30 transition-all"
                 >
                   <div className="flex items-center gap-4">
@@ -685,7 +687,7 @@ export default function LogoGenerator() {
                   <svg className="w-5 h-5 text-gray-500 group-hover:text-violet-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                   </svg>
-                </Link>
+                </a>
               </>
             ) : (
               /* Premium AI Preview */
