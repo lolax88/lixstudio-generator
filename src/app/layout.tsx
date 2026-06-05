@@ -4,6 +4,7 @@ import './globals.css';
 import { LanguageProvider } from '@/context/LanguageContext';
 import { Analytics } from '@vercel/analytics/react';
 import MetaPixel from '@/components/MetaPixel';
+import GoogleAnalytics from '@/components/GoogleAnalytics';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -125,6 +126,7 @@ export default function RootLayout({
         </LanguageProvider>
         <Analytics />
         <MetaPixel />
+        <GoogleAnalytics />
       </body>
     </html>
   );
