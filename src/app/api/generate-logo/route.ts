@@ -46,47 +46,67 @@ async function tryHuggingFace(prompt: string, apiKey: string): Promise<{ image: 
   ];
   for (const model of models) {
     try {
+      console.log(`[HF] Trying model: ${model}`);
       const res = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ inputs: prompt, parameters: { width: 1024, height: 1024 } }),
       });
+      console.log(`[HF] ${model} response: ${res.status}`);
       if (res.ok) {
         const blob = await res.arrayBuffer();
         const b64 = Buffer.from(blob).toString('base64');
         const ct = res.headers.get('content-type') || 'image/png';
         return { image: `data:${ct};base64,${b64}`, provider: `huggingface/${model.split('/')[1]}` };
       }
-    } catch { continue; }
+      const errBody = await res.text().catch(() => '');
+      console.log(`[HF] ${model} error:`, errBody.slice(0, 200));
+    } catch (e: any) { 
+      console.log(`[HF] ${model} exception:`, e?.message);
+      continue; 
+    }
   }
   return null;
 }
 
-// Try generating with Google AI Studio (Gemini 2.0 Flash)
+// Try generating with Google AI Studio (Gemini)
 async function tryGoogleAI(prompt: string, apiKey: string): Promise<{ image: string; provider: string } | null> {
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `Generate a professional logo: ${prompt}` }] }],
-          generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
-        }),
+  const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+  for (const model of models) {
+    try {
+      console.log(`[Google AI] Trying model: ${model}`);
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `Generate a professional logo: ${prompt}` }] }],
+            generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+          }),
+        }
+      );
+      console.log(`[Google AI] ${model} response: ${res.status}`);
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => '');
+        console.log(`[Google AI] ${model} error:`, errBody.slice(0, 200));
+        continue;
       }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const parts = data.candidates?.[0]?.content?.parts || [];
-    for (const part of parts) {
-      if (part.inlineData?.data) {
-        const mime = part.inlineData.mimeType || 'image/png';
-        return { image: `data:${mime};base64,${part.inlineData.data}`, provider: 'google-ai-studio' };
+      const data = await res.json();
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      for (const part of parts) {
+        if (part.inlineData?.data) {
+          const mime = part.inlineData.mimeType || 'image/png';
+          return { image: `data:${mime};base64,${part.inlineData.data}`, provider: `google-ai/${model}` };
+        }
       }
+      console.log(`[Google AI] ${model} no image in response`);
+    } catch (e: any) { 
+      console.log(`[Google AI] ${model} exception:`, e?.message);
+      continue; 
     }
-    return null;
-  } catch { return null; }
+  }
+  return null;
 }
 
 async function tryPollinations(prompt: string): Promise<{ image: string; provider: string } | null> {
