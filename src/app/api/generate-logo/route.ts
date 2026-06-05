@@ -73,7 +73,7 @@ async function tryHuggingFace(prompt: string, apiKey: string): Promise<{ image: 
 
 // Try generating with Google AI Studio (Gemini)
 async function tryGoogleAI(prompt: string, apiKey: string): Promise<{ image: string; provider: string } | null> {
-  const models = ['gemini-2.0-flash-preview-image-generation', 'gemini-2.0-flash-exp'];
+  const models = ['gemini-2.0-flash-preview-image-generation'];
   for (const model of models) {
     try {
       console.log(`[Google AI] Trying model: ${model}`);
