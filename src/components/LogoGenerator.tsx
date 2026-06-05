@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { Industry, LogoVariant, ColorPalette, DesignPattern, LogoConfig } from '@/lib/types';
 import { generateLogo, downloadSvg, downloadPng } from '@/lib/logoGenerator';
 import { ALL_PALETTES, getPaletteForIndustry } from '@/lib/colorPalettes';
@@ -48,7 +49,7 @@ const UMKM_EXAMPLES = [
 ];
 
 export default function LogoGenerator() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
 
   const [brandName, setBrandName] = useState('');
   const [industry, setIndustry] = useState<Industry>('tech');
@@ -662,6 +663,29 @@ export default function LogoGenerator() {
                     </button>
                   </div>
                 </div>
+
+                {/* Portfolio CTA */}
+                <Link
+                  href="/portfolio"
+                  className="group bg-gray-900/50 rounded-2xl border border-gray-800/50 p-5 flex items-center justify-between hover:border-violet-500/30 transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-2xl group-hover:bg-violet-500/20 transition-colors">
+                      🎨
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-white">
+                        {lang === 'id' ? 'Lihat 20+ Contoh Logo Profesional' : 'See 20+ Professional Logo Examples'}
+                      </h4>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {lang === 'id' ? 'Dari klien kami — warung kopi, villa, rental motor, dan lainnya' : 'From our clients — coffee shops, villas, motor rentals, and more'}
+                      </p>
+                    </div>
+                  </div>
+                  <svg className="w-5 h-5 text-gray-500 group-hover:text-violet-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
               </>
             ) : (
               /* Premium AI Preview */
