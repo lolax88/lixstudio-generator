@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { LanguageProvider } from '@/context/LanguageContext';
 import { Analytics } from '@vercel/analytics/react';
+import MetaPixel from '@/components/MetaPixel';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -123,6 +124,7 @@ export default function RootLayout({
           {children}
         </LanguageProvider>
         <Analytics />
+        <MetaPixel />
       </body>
     </html>
   );

@@ -9,6 +9,7 @@ import { ALL_PATTERNS } from '@/lib/patterns';
 import LogoPreview from './LogoPreview';
 import { useLang } from '@/context/LanguageContext';
 import { TranslationKey } from '@/lib/i18n';
+import { trackEvent } from './MetaPixel';
 
 // 6 styles from Nutlope/logocreator
 type AiStyle = 'tech' | 'flashy' | 'modern' | 'playful' | 'abstract' | 'minimal';
@@ -196,6 +197,7 @@ export default function LogoGenerator() {
       }
 
       setAiImage(data.image);
+      trackEvent('Purchase', { content_name: 'AI Logo', brand: brandName || 'Brand' });
     } catch {
       setAiError('Network error. Please try again.');
     } finally {
@@ -215,10 +217,12 @@ export default function LogoGenerator() {
 
   const handleDownloadSvg = useCallback(() => {
     downloadSvg(svgContent, `${brandName || 'logo'}-${variant}`);
+    trackEvent('Download', { content_name: 'SVG', brand: brandName || 'Brand' });
   }, [svgContent, brandName, variant]);
 
   const handleDownloadPng = useCallback(() => {
     downloadPng(svgContent, `${brandName || 'logo'}-${variant}`);
+    trackEvent('Download', { content_name: 'PNG', brand: brandName || 'Brand' });
   }, [svgContent, brandName, variant]);
 
   return (
