@@ -38,8 +38,8 @@ export default function Hero() {
         </h1>
 
         <p className="text-lg sm:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-          LixStudio generates professional SVG logos using advanced geometric patterns, dot matrices, and node networks.
-          <span className="text-gray-300 font-medium"> No design skills needed.</span>
+          Buat logo profesional untuk bisnis Anda dalam hitungan detik.
+          <span className="text-gray-300 font-medium"> Gratis, tanpa perlu keahlian desain.</span>
         </p>
 
         {/* CTA buttons */}
@@ -48,13 +48,13 @@ export default function Hero() {
             href="/generator"
             className="px-8 py-3.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white font-semibold rounded-xl hover:from-violet-500 hover:to-purple-500 transition-all shadow-xl shadow-violet-500/25 text-lg"
           >
-            Start Generating — Free
+            Buat Logo — Gratis
           </Link>
           <a
             href="#how-it-works"
             className="px-8 py-3.5 border border-gray-700 text-gray-300 font-medium rounded-xl hover:bg-gray-800/50 hover:border-gray-600 transition-all"
           >
-            See How It Works
+            Lihat Cara Kerjanya
           </a>
         </div>
 
