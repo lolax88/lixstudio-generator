@@ -132,7 +132,7 @@ async function tryReplicate(prompt: string, apiKey: string): Promise<{ image: st
     const res = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions', {
       method: 'POST',
       headers: {
-        'Authorization': `Token ${apiKey}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'Prefer': 'wait',
       },

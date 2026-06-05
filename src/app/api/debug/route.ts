@@ -13,7 +13,7 @@ export async function GET() {
       const res = await fetch('https://api.replicate.com/v1/predictions', {
         method: 'POST',
         headers: {
-          'Authorization': `Token ${replicateKey}`,
+          'Authorization': `Bearer ${replicateKey}`,
           'Content-Type': 'application/json',
           'Prefer': 'wait',
         },
