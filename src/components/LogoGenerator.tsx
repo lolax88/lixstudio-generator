@@ -74,8 +74,10 @@ export default function LogoGenerator() {
   // BYOK: User's API keys (persisted in localStorage)
   const [userAPIKey, setUserAPIKey] = useState('');
   const [userHFKey, setUserHFKey] = useState('');
+  const [userGoogleKey, setUserGoogleKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [showHFKey, setShowHFKey] = useState(false);
+  const [showGoogleKey, setShowGoogleKey] = useState(false);
 
   // AI color picker
   const [primaryColor, setPrimaryColor] = useState('#7C3AED');
@@ -91,8 +93,10 @@ export default function LogoGenerator() {
   useEffect(() => {
     const savedTogether = localStorage.getItem('lixstudio-api-key');
     const savedHF = localStorage.getItem('lixstudio-hf-key');
+    const savedGoogle = localStorage.getItem('lixstudio-google-key');
     if (savedTogether) setUserAPIKey(savedTogether);
     if (savedHF) setUserHFKey(savedHF);
+    if (savedGoogle) setUserGoogleKey(savedGoogle);
   }, []);
 
   // Save API keys to localStorage
@@ -104,6 +108,11 @@ export default function LogoGenerator() {
   const handleHFKeyChange = useCallback((val: string) => {
     setUserHFKey(val);
     localStorage.setItem('lixstudio-hf-key', val);
+  }, []);
+
+  const handleGoogleKeyChange = useCallback((val: string) => {
+    setUserGoogleKey(val);
+    localStorage.setItem('lixstudio-google-key', val);
   }, []);
 
   // Update palette when industry changes
@@ -147,6 +156,7 @@ export default function LogoGenerator() {
         body: JSON.stringify({
           userAPIKey: userAPIKey || undefined,
           userHFKey: userHFKey || undefined,
+          userGoogleKey: userGoogleKey || undefined,
           brandName: brandName || 'Brand',
           industry,
           style: aiStyle,
@@ -260,7 +270,7 @@ export default function LogoGenerator() {
                 </div>
 
                 {/* Together AI Key (Paid, $5 free credit) */}
-                <div>
+                <div className="mb-4">
                   <div className="flex items-center gap-2 mb-1.5">
                     <span className="text-xs font-medium text-orange-400">⚡ Together AI</span>
                     <span className="text-[10px] px-1.5 py-0.5 bg-orange-500/20 text-orange-300 rounded-full">$5 FREE</span>
@@ -281,6 +291,32 @@ export default function LogoGenerator() {
                     Get $5 free credit at{' '}
                     <a href="https://api.together.xyz" target="_blank" rel="noopener" className="text-orange-400 hover:underline">
                       api.together.xyz
+                    </a>
+                  </p>
+                </div>
+
+                {/* Google AI Studio Key (FREE) */}
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-xs font-medium text-blue-400">🔵 Google AI Studio</span>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-500/20 text-blue-300 rounded-full">FREE</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showGoogleKey ? 'text' : 'password'}
+                      value={userGoogleKey}
+                      onChange={e => handleGoogleKeyChange(e.target.value)}
+                      placeholder="AIzaSyxxxxxxx"
+                      className="w-full px-4 py-2.5 pr-10 bg-gray-800/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-all text-sm"
+                    />
+                    <button type="button" onClick={() => setShowGoogleKey(!showGoogleKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
+                      {showGoogleKey ? '🙈' : '👁️'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Get free key at{' '}
+                    <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" className="text-blue-400 hover:underline">
+                      aistudio.google.com/apikey
                     </a>
                   </p>
                 </div>

@@ -63,6 +63,33 @@ async function tryHuggingFace(prompt: string, apiKey: string): Promise<{ image: 
 }
 
 // Try generating with Pollinations.ai (free, no key)
+// Try generating with Google AI Studio (Gemini 2.0 Flash)
+async function tryGoogleAI(prompt: string, apiKey: string): Promise<{ image: string; provider: string } | null> {
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `Generate a professional logo: ${prompt}` }] }],
+          generationConfig: { responseModalities: ['TEXT', 'IMAGE'] },
+        }),
+      }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    for (const part of parts) {
+      if (part.inlineData?.data) {
+        const mime = part.inlineData.mimeType || 'image/png';
+        return { image: `data:${mime};base64,${part.inlineData.data}`, provider: 'google-ai-studio' };
+      }
+    }
+    return null;
+  } catch { return null; }
+}
+
 async function tryPollinations(prompt: string): Promise<{ image: string; provider: string } | null> {
   try {
     const encoded = encodeURIComponent(prompt);
@@ -93,7 +120,7 @@ function getEnvKeys(prefix: string): string[] {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { userAPIKey, userHFKey, brandName, industry, style, primaryColor, backgroundColor, additionalInfo } = body;
+    const { userAPIKey, userHFKey, userGoogleKey, brandName, industry, style, primaryColor, backgroundColor, additionalInfo } = body;
 
     if (!brandName) {
       return NextResponse.json({ error: 'Brand name is required' }, { status: 400 });
@@ -121,12 +148,22 @@ export async function POST(req: NextRequest) {
       attempts.push({ label: 'user-hf', fn: () => tryHuggingFace(prompt, userHFKey) });
     }
 
-    // 4. Server Hugging Face keys (HF_TOKEN, HF_TOKEN_2, ...)
+    // 4. User's Google AI Studio key (BYOK)
+    if (userGoogleKey) {
+      attempts.push({ label: 'user-google', fn: () => tryGoogleAI(prompt, userGoogleKey) });
+    }
+
+    // 5. Server Hugging Face keys (HF_TOKEN, HF_TOKEN_2, ...)
     for (const key of getEnvKeys('HF_TOKEN')) {
       attempts.push({ label: `server-hf-${key.slice(-4)}`, fn: () => tryHuggingFace(prompt, key) });
     }
 
-    // 5. Pollinations.ai (free, no key)
+    // 5. Server Google AI Studio keys (GOOGLE_AI_KEY, GOOGLE_AI_KEY_2, ...)
+    for (const key of getEnvKeys('GOOGLE_AI_KEY')) {
+      attempts.push({ label: `server-google-${key.slice(-4)}`, fn: () => tryGoogleAI(prompt, key) });
+    }
+
+    // 6. Pollinations.ai (free, no key)
     attempts.push({ label: 'pollinations', fn: () => tryPollinations(prompt) });
 
     // Execute fallback chain
