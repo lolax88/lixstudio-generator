@@ -191,9 +191,72 @@ function parseSVG(svgContent: string): { paths: { d: string; fill: string }[]; v
     if (d) {
       let fill = path.getAttribute('fill') || '#000000';
       if (fill === 'none') fill = '#000000';
+      
+      // Check for class-based fill
+      const className = path.getAttribute('class');
+      if (className) {
+        const styleMatch = svgContent.match(new RegExp(`\\.${className}\\s*\\{[^}]*fill:\\s*([^;\\s]+)`));
+        if (styleMatch) fill = styleMatch[1];
+      }
+      
+      // Note: path transforms are complex to apply to d attribute
+      // For now we'll rely on the shape being positioned correctly
+      // Complex transforms would need a full SVG path transform library
+      
       paths.push({ d, fill });
     }
   });
+
+  // Helper: parse transform attribute
+  function parseTransform(transformStr: string): { tx: number; ty: number; rotate: number; sx: number; sy: number } {
+    const result = { tx: 0, ty: 0, rotate: 0, sx: 1, sy: 1 };
+    if (!transformStr) return result;
+    
+    const translateMatch = transformStr.match(/translate\(([^)]+)\)/);
+    if (translateMatch) {
+      const parts = translateMatch[1].split(/[\s,]+/).map(Number);
+      result.tx = parts[0] || 0;
+      result.ty = parts[1] || 0;
+    }
+    
+    const rotateMatch = transformStr.match(/rotate\(([^)]+)\)/);
+    if (rotateMatch) {
+      result.rotate = parseFloat(rotateMatch[1]) || 0;
+    }
+    
+    const scaleMatch = transformStr.match(/scale\(([^)]+)\)/);
+    if (scaleMatch) {
+      const parts = scaleMatch[1].split(/[\s,]+/).map(Number);
+      result.sx = parts[0] || 1;
+      result.sy = parts[1] || parts[0] || 1;
+    }
+    
+    return result;
+  }
+
+  // Helper: apply transform to point
+  function applyTransform(x: number, y: number, transform: { tx: number; ty: number; rotate: number; sx: number; sy: number }): { x: number; y: number } {
+    // Scale
+    let nx = x * transform.sx;
+    let ny = y * transform.sy;
+    
+    // Rotate (around origin)
+    if (transform.rotate !== 0) {
+      const rad = (transform.rotate * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+      const rx = nx * cos - ny * sin;
+      const ry = nx * sin + ny * cos;
+      nx = rx;
+      ny = ry;
+    }
+    
+    // Translate
+    nx += transform.tx;
+    ny += transform.ty;
+    
+    return { x: nx, y: ny };
+  }
 
   // Get all rect elements
   const rectElements = doc.querySelectorAll('rect');
@@ -203,9 +266,32 @@ function parseSVG(svgContent: string): { paths: { d: string; fill: string }[]; v
     const w = parseFloat(rect.getAttribute('width') || '0');
     const h = parseFloat(rect.getAttribute('height') || '0');
     if (w > 0 && h > 0) {
-      const d = `M${x},${y} L${x+w},${y} L${x+w},${y+h} L${x},${y+h} Z`;
+      const transform = parseTransform(rect.getAttribute('transform') || '');
+      
+      // Create rect corners
+      const corners = [
+        { x: x, y: y },
+        { x: x + w, y: y },
+        { x: x + w, y: y + h },
+        { x: x, y: y + h },
+      ];
+      
+      // Apply transform to corners
+      const transformedCorners = corners.map(c => applyTransform(c.x, c.y, transform));
+      
+      // Create path from transformed corners
+      const d = `M${transformedCorners[0].x},${transformedCorners[0].y} L${transformedCorners[1].x},${transformedCorners[1].y} L${transformedCorners[2].x},${transformedCorners[2].y} L${transformedCorners[3].x},${transformedCorners[3].y} Z`;
+      
       let fill = rect.getAttribute('fill') || '#000000';
       if (fill === 'none') fill = '#000000';
+      
+      // Check for class-based fill
+      const className = rect.getAttribute('class');
+      if (className) {
+        const styleMatch = svgContent.match(new RegExp(`\\.${className}\\s*\\{[^}]*fill:\\s*([^;\\s]+)`));
+        if (styleMatch) fill = styleMatch[1];
+      }
+      
       paths.push({ d, fill });
     }
   });
@@ -260,7 +346,10 @@ export default function SVGToThree({ svgContent, depth = 40, bevelEnabled = true
 
     // Clean up previous
     if (rendererRef.current) {
-      container.removeChild(rendererRef.current.domElement);
+      const domElement = rendererRef.current.domElement;
+      if (domElement && domElement.parentNode === container) {
+        container.removeChild(domElement);
+      }
       rendererRef.current.dispose();
     }
     if (animationRef.current) {
