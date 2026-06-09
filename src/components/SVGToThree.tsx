@@ -409,27 +409,23 @@ export default function SVGToThree({ svgContent, depth = 40, bevelEnabled = true
     rimLight.position.set(0, 100, -200);
     scene.add(rimLight);
 
-    // === GROUND GRID ===
-    const gridHelper = new THREE.GridHelper(500, 20, 0x444466, 0x333355);
+    // Ground grid - very subtle
+    const gridHelper = new THREE.GridHelper(500, 10, 0x222244, 0x1a1a33);
     gridHelper.position.y = -1;
+    gridHelper.material.transparent = true;
+    gridHelper.material.opacity = 0.3;
     scene.add(gridHelper);
 
-    // Ground plane (semi-transparent for shadow)
-    const groundGeo = new THREE.PlaneGeometry(500, 500);
-    const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x1a1a2e,
-      transparent: true,
-      opacity: 0.8,
-    });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -1;
-    ground.receiveShadow = true;
-    scene.add(ground);
-
     // === PARSE SVG & BUILD 3D MODEL ===
-    const { paths, viewBox } = parseSVG(svgContent);
+    let { paths, viewBox } = parseSVG(svgContent);
     console.log('SVG parsed:', paths.length, 'paths');
+    
+    // Limit paths for mobile performance (max 50)
+    const MAX_PATHS = 50;
+    if (paths.length > MAX_PATHS) {
+      console.log(`Limiting paths: ${paths.length} → ${MAX_PATHS}`);
+      paths = paths.slice(0, MAX_PATHS);
+    }
 
     const modelGroup = new THREE.Group();
 

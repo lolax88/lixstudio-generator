@@ -134,10 +134,10 @@ export default function ThreeDConverterPage() {
             resolve(svgString);
           },
           {
-            pathomit: 10,
-            qtres: 3,
-            colorsampling: 2,
-            numberofcolors: 16,
+            pathomit: 50,
+            qtres: 1,
+            colorsampling: 0,
+            numberofcolors: 4,
             mincolorratio: 0,
             colorquantcycles: 3,
             blurradius: 0,
