@@ -405,7 +405,7 @@ export default function SVGToThree({ svgContent, depth = 40, bevelEnabled = true
 
         modelGroup.add(mesh);
         meshCount++;
-        totalTriangles += geometry.index ? geometry.index.count / 3 : 0;
+        totalTriangles += geometry.attributes.position.count / 3;
       });
 
       console.log(`Created ${meshCount} meshes, ~${totalTriangles} triangles`);
