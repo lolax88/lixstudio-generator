@@ -12,3 +12,18 @@ declare module 'three/addons/exporters/OBJExporter.js' {
     parse(input: any): string;
   }
 }
+declare module 'imagetracerjs' {
+  interface ImageTracerOptions {
+    scale?: number;
+    ltres?: number;
+    qtres?: number;
+    pathomit?: number;
+    colorsampling?: number;
+    numberofcolors?: number;
+  }
+  export function imagedataToSVG(imageData: ImageData, options?: ImageTracerOptions): string;
+  const ImageTracer: {
+    imagedataToSVG: (imageData: ImageData, options?: ImageTracerOptions) => string;
+  };
+  export default ImageTracer;
+}

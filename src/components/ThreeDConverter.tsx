@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect } from 'react';
+import PngToSvgConverter from './PngToSvgConverter';
 
 export default function ThreeDConverter() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -16,6 +17,7 @@ export default function ThreeDConverter() {
   const [bevel, setBevel] = useState(0.5);
   const [autoRotate, setAutoRotate] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'svg' | 'png'>('svg');
 
   // Initialize Three.js scene
   useEffect(() => {
@@ -321,8 +323,8 @@ export default function ThreeDConverter() {
     return shape;
   };
 
-  // Handle file upload
-  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle SVG file upload
+  const handleSvgUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -333,6 +335,12 @@ export default function ThreeDConverter() {
       setSvgContent(content);
     };
     reader.readAsText(file);
+  }, []);
+
+  // Handle PNG to SVG conversion result
+  const handlePngToSvg = useCallback((svgString: string, name: string) => {
+    setSvgContent(svgString);
+    setFileName(name);
   }, []);
 
   // Export as GLTF
@@ -351,7 +359,7 @@ export default function ThreeDConverter() {
 
       const a = document.createElement('a');
       a.href = url;
-      a.download = fileName.replace('.svg', '') + '-3d.glb';
+      a.download = fileName.replace('.svg', '').replace('.png', '') + '-3d.glb';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -378,7 +386,7 @@ export default function ThreeDConverter() {
 
       const a = document.createElement('a');
       a.href = url;
-      a.download = fileName.replace('.svg', '') + '-3d.obj';
+      a.download = fileName.replace('.svg', '').replace('.png', '') + '-3d.obj';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -401,7 +409,7 @@ export default function ThreeDConverter() {
           </span>
         </h1>
         <p className="text-gray-400 max-w-lg mx-auto">
-          Ubah logo SVG Anda menjadi model 3D. Upload file SVG dari Illustrator, lalu ekspor sebagai GLTF atau OBJ.
+          Ubah logo Anda menjadi model 3D. Upload SVG langsung, atau konversi PNG ke SVG dulu.
         </p>
       </div>
 
@@ -409,19 +417,48 @@ export default function ThreeDConverter() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Controls Panel */}
           <div className="lg:col-span-1 space-y-4">
-            {/* Upload */}
-            <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-5">
-              <h3 className="text-sm font-medium text-gray-300 mb-3">Upload SVG</h3>
-              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-700 rounded-lg cursor-pointer hover:border-violet-500/50 hover:bg-violet-500/5 transition-all">
-                <svg className="w-8 h-8 text-gray-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                <span className="text-sm text-gray-400">
-                  {fileName || 'Klik untuk upload SVG'}
-                </span>
-                <input type="file" accept=".svg" className="hidden" onChange={handleFileUpload} />
-              </label>
-              {fileName && (
+            {/* Input Method Tabs */}
+            <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4">
+              <div className="flex gap-1 p-1 bg-gray-800/50 rounded-lg mb-4">
+                <button
+                  onClick={() => setActiveTab('svg')}
+                  className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-all ${
+                    activeTab === 'svg'
+                      ? 'bg-violet-600 text-white shadow-lg shadow-violet-500/25'
+                      : 'text-gray-400 hover:text-gray-300'
+                  }`}
+                >
+                  📐 Upload SVG
+                </button>
+                <button
+                  onClick={() => setActiveTab('png')}
+                  className={`flex-1 px-3 py-2 text-xs font-medium rounded-md transition-all ${
+                    activeTab === 'png'
+                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/25'
+                      : 'text-gray-400 hover:text-gray-300'
+                  }`}
+                >
+                  🖼️ PNG ke SVG
+                </button>
+              </div>
+
+              {activeTab === 'svg' ? (
+                /* SVG Upload */
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-700 rounded-lg cursor-pointer hover:border-violet-500/50 hover:bg-violet-500/5 transition-all">
+                  <svg className="w-8 h-8 text-gray-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <span className="text-sm text-gray-400">
+                    {activeTab === 'svg' && svgContent ? fileName : 'Klik untuk upload SVG'}
+                  </span>
+                  <input type="file" accept=".svg" className="hidden" onChange={handleSvgUpload} />
+                </label>
+              ) : (
+                /* PNG to SVG Converter */
+                <PngToSvgConverter onSvgGenerated={handlePngToSvg} />
+              )}
+
+              {svgContent && activeTab === 'svg' && (
                 <p className="text-xs text-violet-400 mt-2 truncate">✓ {fileName}</p>
               )}
             </div>
@@ -534,7 +571,7 @@ export default function ThreeDConverter() {
                     <svg className="w-16 h-16 text-gray-700 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
                     </svg>
-                    <p className="text-sm text-gray-500">Upload SVG untuk mulai</p>
+                    <p className="text-sm text-gray-500">Upload SVG atau konversi PNG untuk mulai</p>
                   </div>
                 </div>
               )}
