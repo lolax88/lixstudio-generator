@@ -1,7 +1,79 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
-import SVGToThree from '@/components/SVGToThree';
+import { useState, useCallback, useRef, Suspense, lazy, Component, type ReactNode, type ErrorInfo } from 'react';
+
+// Lazy load Three.js component (gak block page render)
+const SVGToThree = lazy(() => import('@/components/SVGToThree'));
+
+// Error Boundary - cegah blank page kalau error
+class ErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode; fallback: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('3D Converter Error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
+
+// Loading component untuk 3D viewport
+function Loading3D() {
+  return (
+    <div className="w-full h-[400px] bg-slate-900/50 rounded-2xl border border-slate-700/50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="text-4xl mb-3 animate-pulse">🧊</div>
+        <p className="text-slate-400 text-sm">Memuat 3D engine...</p>
+        <p className="text-slate-500 text-xs mt-1">Tunggu sebentar ya~</p>
+      </div>
+    </div>
+  );
+}
+
+// Error fallback untuk 3D viewport
+function Error3D({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="w-full h-[400px] bg-slate-900/50 rounded-2xl border border-red-500/30 flex items-center justify-center">
+      <div className="text-center px-4">
+        <div className="text-4xl mb-3">😵</div>
+        <p className="text-red-400 font-semibold mb-2">3D engine gagal dimuat</p>
+        <p className="text-slate-500 text-xs mb-4">
+          Mungkin browser kamu gak support WebGL atau memory habis
+        </p>
+        <button
+          onClick={onRetry}
+          className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-500 transition-all"
+        >
+          🔄 Coba Lagi
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Check WebGL support
+function checkWebGLSupport(): boolean {
+  try {
+    const canvas = document.createElement('canvas');
+    return !!(canvas.getContext('webgl') || canvas.getContext('webgl2'));
+  } catch {
+    return false;
+  }
+}
 
 export default function ThreeDConverterPage() {
   const [svgContent, setSvgContent] = useState<string | null>(null);
@@ -11,8 +83,15 @@ export default function ThreeDConverterPage() {
   const [activeTab, setActiveTab] = useState<'svg' | 'png'>('svg');
   const [pngPreview, setPngPreview] = useState<string | null>(null);
   const [isConverting, setIsConverting] = useState(false);
+  const [threeKey, setThreeKey] = useState(0); // Force remount on retry
+  const [webglSupported, setWebglSupported] = useState<boolean | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pngInputRef = useRef<HTMLInputElement>(null);
+
+  // Check WebGL on mount
+  useState(() => {
+    setWebglSupported(checkWebGLSupport());
+  });
 
   // Handle SVG file upload
   const handleSVGUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,9 +125,12 @@ export default function ThreeDConverterPage() {
 
       // Convert PNG to SVG
       const svgStr = await new Promise<string>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timeout')), 30000);
+        
         ImageTracer.imageToSVG(
           previewUrl,
           (svgString: string) => {
+            clearTimeout(timeout);
             resolve(svgString);
           },
           {
@@ -75,7 +157,7 @@ export default function ThreeDConverterPage() {
       setActiveTab('svg'); // Switch to SVG tab to show 3D
     } catch (err) {
       console.error('PNG conversion error:', err);
-      alert('Gagal convert PNG ke SVG. Coba file lain.');
+      alert('Gagal convert PNG ke SVG. Coba file lain atau kurangi ukuran gambar.');
     } finally {
       setIsConverting(false);
     }
@@ -114,6 +196,16 @@ export default function ThreeDConverterPage() {
           </h1>
           <p className="text-slate-400">Upload SVG atau PNG → jadi model 3D yang bisa di-download</p>
         </div>
+
+        {/* WebGL Warning */}
+        {webglSupported === false && (
+          <div className="mb-6 p-4 bg-red-900/30 border border-red-500/30 rounded-2xl">
+            <p className="text-red-400 text-sm">
+              ⚠️ <strong>Browser kamu gak support WebGL.</strong> 3D viewer gak bisa jalan. 
+              Coba pakai Chrome/Firefox terbaru, atau tutup beberapa tab biar memory cukup.
+            </p>
+          </div>
+        )}
 
         {/* Tab Switcher */}
         <div className="flex gap-2 mb-6">
@@ -172,7 +264,7 @@ export default function ThreeDConverterPage() {
             </div>
 
             {/* Settings */}
-            {svgContent && (
+            {svgContent && webglSupported && (
               <div className="bg-slate-800/50 rounded-2xl p-5 border border-slate-700/50">
                 <h3 className="text-sm font-semibold text-slate-300 mb-4">⚙️ Pengaturan 3D</h3>
                 <div className="space-y-4">
@@ -274,19 +366,34 @@ export default function ThreeDConverterPage() {
         )}
 
         {/* 3D Viewport */}
-        {svgContent && (
+        {svgContent && webglSupported && (
           <div className="mt-8">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
               <span className="w-3 h-3 bg-purple-500 rounded-full"></span>
               3D Viewport
             </h2>
-            <SVGToThree
-              svgContent={svgContent}
-              depth={depth}
-              bevelEnabled={bevelEnabled}
-            />
+            <ErrorBoundary
+              fallback={<Error3D onRetry={() => setThreeKey(prev => prev + 1)} />}
+            >
+              <Suspense fallback={<Loading3D />}>
+                <SVGToThree
+                  key={threeKey}
+                  svgContent={svgContent}
+                  depth={depth}
+                  bevelEnabled={bevelEnabled}
+                />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         )}
+
+        {/* Tips untuk mobile */}
+        <div className="mt-8 p-4 bg-slate-800/30 rounded-2xl border border-slate-700/30">
+          <p className="text-xs text-slate-500 text-center">
+            💡 <strong>Tips Mobile:</strong> Tutup tab yang gak dipake biar gak crash. 
+            3D viewer butuh memory cukup untuk jalan.
+          </p>
+        </div>
       </div>
     </div>
   );
