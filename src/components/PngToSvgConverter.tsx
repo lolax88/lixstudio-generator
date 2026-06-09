@@ -75,7 +75,15 @@ export default function PngToSvgConverter({ onSvgGenerated }: PngToSvgConverterP
 
       // Convert to SVG using ImageTracer
       const options = qualityPresets[quality];
-      const svgString = ImageTracer.imagedataToSVG(imageData, options);
+      const dataUrl = canvas.toDataURL('image/png');
+      
+      const svgString = await new Promise<string>((resolve, reject) => {
+        ImageTracer.imageToSVG(
+          dataUrl,
+          (svg: string) => resolve(svg),
+          options
+        );
+      });
 
       setSvgPreview(svgString);
 

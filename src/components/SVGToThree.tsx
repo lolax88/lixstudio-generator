@@ -13,7 +13,7 @@ interface SVGToThreeProps {
 }
 
 // Parse SVG path d attribute to THREE.Shape
-function parseSVGPath(d: string): THREE.Shape | null {
+function parseSVGPath(d: string): any {
   const shape = new THREE.Shape();
   const commands = d.match(/[MmLlHhVvCcSsQqTtAaZz][^MmLlHhVvCcSsQqTtAaZz]*/g);
   if (!commands) return null;
@@ -230,7 +230,7 @@ function parseSVG(svgContent: string): { paths: { d: string; fill: string }[]; v
 }
 
 // Convert hex color to THREE.Color
-function hexToColor(hex: string): THREE.Color {
+function hexToColor(hex: string): any {
   try {
     return new THREE.Color(hex);
   } catch {
@@ -240,11 +240,11 @@ function hexToColor(hex: string): THREE.Color {
 
 export default function SVGToThree({ svgContent, depth = 40, bevelEnabled = true }: SVGToThreeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const sceneRef = useRef<any | null>(null);
+  const cameraRef = useRef<any | null>(null);
+  const rendererRef = useRef<any | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
-  const modelGroupRef = useRef<THREE.Group | null>(null);
+  const modelGroupRef = useRef<any | null>(null);
   const animationRef = useRef<number>(0);
 
   const [autoRotate, setAutoRotate] = useState(true);
@@ -375,7 +375,7 @@ export default function SVGToThree({ svgContent, depth = 40, bevelEnabled = true
         }
 
         // Extrude settings - REAL 3D depth
-        const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+        const extrudeSettings: any = {
           depth: depth, // Real depth in units
           bevelEnabled: bevelEnabled,
           bevelThickness: depth * 0.15,
