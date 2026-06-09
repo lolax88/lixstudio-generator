@@ -206,10 +206,10 @@ export default function ThreeDConverter() {
       });
 
       const extrudeSettings = {
-        depth: depth,
+        depth: depth * 10, // Scale depth relative to SVG coordinates
         bevelEnabled: bevel > 0,
-        bevelThickness: bevel,
-        bevelSize: bevel,
+        bevelThickness: bevel * 5,
+        bevelSize: bevel * 5,
         bevelSegments: bevel > 0 ? 2 : 0,
       };
 
@@ -227,16 +227,20 @@ export default function ThreeDConverter() {
 
       if (!hasValidMesh) return false;
 
-      // Center the group
+      // Center each child individually
       const box = new THREE.Box3().setFromObject(group);
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3());
-      group.position.sub(center);
+      
+      // Move each child to center
+      group.children.forEach((child: any) => {
+        child.position.sub(center);
+      });
 
       // Scale to fit viewport
       const maxDim = Math.max(size.x, size.y, size.z);
       if (maxDim > 0) {
-        const scale = 3 / maxDim;
+        const scale = 4 / maxDim; // Slightly larger scale
         group.scale.setScalar(scale);
       }
 
@@ -244,7 +248,7 @@ export default function ThreeDConverter() {
       meshRef.current = group;
 
       if (cameraRef.current) {
-        cameraRef.current.position.set(0, 0, 5);
+        cameraRef.current.position.set(2, 2, 5); // Better angle to show depth
         cameraRef.current.lookAt(0, 0, 0);
       }
 
