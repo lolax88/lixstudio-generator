@@ -7,6 +7,7 @@ export const translations = {
   nav_pricing: { id: 'Harga', en: 'Pricing' },
   nav_faq: { id: 'FAQ', en: 'FAQ' },
   nav_cta: { id: 'Buat Logo', en: 'Create Logo' },
+  nav_3d_converter: { id: '3D Converter', en: '3D Converter' },
 
   // ── HERO ──
   hero_badge: { id: '✨ Gratis — Langsung Pakai', en: '✨ Free — Use Instantly' },

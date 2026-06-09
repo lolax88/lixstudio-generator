@@ -29,6 +29,9 @@ export default function Navbar() {
             <Link href="/" className="text-sm text-gray-300 hover:text-white transition-colors">
               {t('nav_home')}
             </Link>
+            <Link href="/3d-converter" className="text-sm text-gray-300 hover:text-white transition-colors">
+              {t('nav_3d_converter')}
+            </Link>
             <Link href="/generator" className="text-sm text-gray-300 hover:text-white transition-colors">
               {t('nav_generator')}
             </Link>
@@ -87,6 +90,7 @@ export default function Navbar() {
           <div className="px-4 py-4 space-y-3">
             <Link href="/" className="block text-gray-300 hover:text-white py-2" onClick={() => setMobileOpen(false)}>{t('nav_home')}</Link>
             <Link href="/generator" className="block text-gray-300 hover:text-white py-2" onClick={() => setMobileOpen(false)}>{t('nav_generator')}</Link>
+            <Link href="/3d-converter" className="block text-gray-300 hover:text-white py-2" onClick={() => setMobileOpen(false)}>{t('nav_3d_converter')}</Link>
             <Link href="/generator" className="block px-4 py-2 bg-violet-600 text-white rounded-lg text-center font-medium" onClick={() => setMobileOpen(false)}>{t('nav_cta')}</Link>
           </div>
         </div>
