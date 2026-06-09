@@ -18,7 +18,6 @@ export default function ThreeDConverter() {
   const [autoRotate, setAutoRotate] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [activeTab, setActiveTab] = useState<'svg' | 'png'>('svg');
-  const [sourceType, setSourceType] = useState<'svg' | 'png'>('svg');
 
   // Initialize Three.js scene
   useEffect(() => {
@@ -101,93 +100,37 @@ export default function ThreeDConverter() {
       sceneRef.current.remove(meshRef.current);
       if (meshRef.current.geometry) meshRef.current.geometry.dispose();
       if (meshRef.current.material) {
-        if (meshRef.current.material.map) meshRef.current.material.map.dispose();
-        meshRef.current.material.dispose();
+        if (Array.isArray(meshRef.current.material)) {
+          meshRef.current.material.forEach((m: any) => {
+            if (m.map) m.map.dispose();
+            m.dispose();
+          });
+        } else {
+          if (meshRef.current.material.map) meshRef.current.material.map.dispose();
+          meshRef.current.material.dispose();
+        }
       }
     }
 
-    // For PNG-sourced SVGs, use texture approach
-    if (sourceType === 'png') {
-      createTextureMesh(THREE, svgContent);
-    } else {
-      // For direct SVG uploads, try path extrusion first
-      const success = createExtrudedMesh(THREE, svgContent);
-      if (!success) {
-        // Fallback to texture approach
-        createTextureMesh(THREE, svgContent);
-      }
+    // Try to create extruded mesh from SVG
+    const success = createExtrudedMesh(THREE, svgContent);
+    if (!success) {
+      // Fallback: create a textured box
+      createTexturedBox(THREE, svgContent);
     }
-  }, [svgContent, depth, bevel, sourceType]);
+  }, [svgContent, depth, bevel]);
 
-  // Create mesh from SVG texture (for PNG conversions)
-  const createTextureMesh = (THREE: any, svgString: string) => {
-    // Render SVG to canvas
-    const canvas = document.createElement('canvas');
-    const size = 512;
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-
-    if (!ctx) return;
-
-    // Fill with transparent background
-    ctx.clearRect(0, 0, size, size);
-
-    // Create an image from SVG
-    const img = new window.Image();
-    const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(svgBlob);
-
-    img.onload = () => {
-      // Draw SVG to canvas (centered, maintaining aspect ratio)
-      const scale = Math.min(size / img.width, size / img.height) * 0.8;
-      const x = (size - img.width * scale) / 2;
-      const y = (size - img.height * scale) / 2;
-      ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-
-      // Create texture from canvas
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.needsUpdate = true;
-
-      // Create a box with the texture
-      const geometry = new THREE.BoxGeometry(3, 3, depth);
-      const materials = [
-        new THREE.MeshPhongMaterial({ color: 0x8b5cf6 }), // right
-        new THREE.MeshPhongMaterial({ color: 0x8b5cf6 }), // left
-        new THREE.MeshPhongMaterial({ color: 0x8b5cf6 }), // top
-        new THREE.MeshPhongMaterial({ color: 0x8b5cf6 }), // bottom
-        new THREE.MeshPhongMaterial({ map: texture, transparent: true }), // front
-        new THREE.MeshPhongMaterial({ map: texture, transparent: true }), // back
-      ];
-
-      const mesh = new THREE.Mesh(geometry, materials);
-      sceneRef.current.add(mesh);
-      meshRef.current = mesh;
-
-      // Reset camera
-      if (cameraRef.current) {
-        cameraRef.current.position.set(0, 0, 5);
-        cameraRef.current.lookAt(0, 0, 0);
-      }
-
-      URL.revokeObjectURL(url);
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      // Fallback: create simple extruded shape
-      createFallbackMesh(THREE);
-    };
-
-    img.src = url;
-  };
-
-  // Create extruded mesh from SVG paths (for direct SVG uploads)
+  // Create extruded mesh from SVG paths
   const createExtrudedMesh = (THREE: any, svgString: string): boolean => {
     try {
       const parser = new DOMParser();
       const doc = parser.parseFromString(svgString, 'image/svg+xml');
-      const paths = doc.querySelectorAll('path, rect, circle, ellipse, polygon');
+      const allPaths = doc.querySelectorAll('path, rect, circle, ellipse, polygon');
+
+      if (allPaths.length === 0) return false;
+
+      // Simplify: take only the largest/most important paths
+      const paths = Array.from(allPaths).slice(0, 50); // Limit to 50 paths max
 
       const shapes: any[] = [];
 
@@ -198,23 +141,51 @@ export default function ThreeDConverter() {
             const y = parseFloat(path.getAttribute('y') || '0');
             const w = parseFloat(path.getAttribute('width') || '10');
             const h = parseFloat(path.getAttribute('height') || '10');
-            const shape = new THREE.Shape();
-            shape.moveTo(x, y);
-            shape.lineTo(x + w, y);
-            shape.lineTo(x + w, y + h);
-            shape.lineTo(x, y + h);
-            shape.closePath();
-            shapes.push(shape);
+            if (w > 0 && h > 0) {
+              const shape = new THREE.Shape();
+              shape.moveTo(x, y);
+              shape.lineTo(x + w, y);
+              shape.lineTo(x + w, y + h);
+              shape.lineTo(x, y + h);
+              shape.closePath();
+              shapes.push(shape);
+            }
           } else if (path.tagName === 'circle') {
             const cx = parseFloat(path.getAttribute('cx') || '0');
             const cy = parseFloat(path.getAttribute('cy') || '0');
             const r = parseFloat(path.getAttribute('r') || '5');
-            const shape = new THREE.Shape();
-            shape.absarc(cx, cy, r, 0, Math.PI * 2);
-            shapes.push(shape);
+            if (r > 0) {
+              const shape = new THREE.Shape();
+              shape.absarc(cx, cy, r, 0, Math.PI * 2);
+              shapes.push(shape);
+            }
+          } else if (path.tagName === 'ellipse') {
+            const cx = parseFloat(path.getAttribute('cx') || '0');
+            const cy = parseFloat(path.getAttribute('cy') || '0');
+            const rx = parseFloat(path.getAttribute('rx') || '5');
+            const ry = parseFloat(path.getAttribute('ry') || '3');
+            if (rx > 0 && ry > 0) {
+              const shape = new THREE.Shape();
+              shape.absellipse(cx, cy, rx, ry, 0, Math.PI * 2);
+              shapes.push(shape);
+            }
+          } else if (path.tagName === 'polygon') {
+            const points = path.getAttribute('points');
+            if (points) {
+              const coords = points.trim().split(/[\s,]+/).map(Number);
+              if (coords.length >= 6) {
+                const shape = new THREE.Shape();
+                shape.moveTo(coords[0], coords[1]);
+                for (let i = 2; i < coords.length; i += 2) {
+                  shape.lineTo(coords[i], coords[i + 1]);
+                }
+                shape.closePath();
+                shapes.push(shape);
+              }
+            }
           } else if (path.tagName === 'path') {
             const d = path.getAttribute('d');
-            if (d) {
+            if (d && d.length < 5000) { // Skip very long paths
               const shape = parseSVGPath(THREE, d);
               if (shape) shapes.push(shape);
             }
@@ -226,6 +197,7 @@ export default function ThreeDConverter() {
 
       if (shapes.length === 0) return false;
 
+      // Create group and extrude each shape
       const group = new THREE.Group();
       const material = new THREE.MeshPhongMaterial({
         color: 0x8b5cf6,
@@ -235,10 +207,10 @@ export default function ThreeDConverter() {
 
       const extrudeSettings = {
         depth: depth,
-        bevelEnabled: true,
+        bevelEnabled: bevel > 0,
         bevelThickness: bevel,
         bevelSize: bevel,
-        bevelSegments: 3,
+        bevelSegments: bevel > 0 ? 2 : 0,
       };
 
       let hasValidMesh = false;
@@ -255,9 +227,18 @@ export default function ThreeDConverter() {
 
       if (!hasValidMesh) return false;
 
+      // Center the group
       const box = new THREE.Box3().setFromObject(group);
       const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
       group.position.sub(center);
+
+      // Scale to fit viewport
+      const maxDim = Math.max(size.x, size.y, size.z);
+      if (maxDim > 0) {
+        const scale = 3 / maxDim;
+        group.scale.setScalar(scale);
+      }
 
       sceneRef.current.add(group);
       meshRef.current = group;
@@ -269,26 +250,59 @@ export default function ThreeDConverter() {
 
       return true;
     } catch (e) {
+      console.error('Extrusion failed:', e);
       return false;
     }
   };
 
-  // Fallback mesh
-  const createFallbackMesh = (THREE: any) => {
-    const geometry = new THREE.BoxGeometry(2, 2, depth);
-    const material = new THREE.MeshPhongMaterial({
-      color: 0x8b5cf6,
-      specular: 0x333333,
-      shininess: 30,
-    });
-    const mesh = new THREE.Mesh(geometry, material);
-    sceneRef.current.add(mesh);
-    meshRef.current = mesh;
+  // Fallback: textured box
+  const createTexturedBox = (THREE: any, svgString: string) => {
+    const canvas = document.createElement('canvas');
+    const size = 512;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
 
-    if (cameraRef.current) {
-      cameraRef.current.position.set(0, 0, 5);
-      cameraRef.current.lookAt(0, 0, 0);
-    }
+    if (!ctx) return;
+
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(0, 0, size, size);
+
+    const img = new window.Image();
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(svgBlob);
+
+    img.onload = () => {
+      const scale = Math.min(size / img.width, size / img.height) * 0.8;
+      const x = (size - img.width * scale) / 2;
+      const y = (size - img.height * scale) / 2;
+      ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+
+      const texture = new THREE.CanvasTexture(canvas);
+
+      const geometry = new THREE.BoxGeometry(3, 3, depth);
+      const materials = [
+        new THREE.MeshPhongMaterial({ color: 0x8b5cf6 }),
+        new THREE.MeshPhongMaterial({ color: 0x8b5cf6 }),
+        new THREE.MeshPhongMaterial({ color: 0x8b5cf6 }),
+        new THREE.MeshPhongMaterial({ color: 0x8b5cf6 }),
+        new THREE.MeshPhongMaterial({ map: texture, transparent: true }),
+        new THREE.MeshPhongMaterial({ map: texture, transparent: true }),
+      ];
+
+      const mesh = new THREE.Mesh(geometry, materials);
+      sceneRef.current.add(mesh);
+      meshRef.current = mesh;
+
+      if (cameraRef.current) {
+        cameraRef.current.position.set(0, 0, 5);
+        cameraRef.current.lookAt(0, 0, 0);
+      }
+
+      URL.revokeObjectURL(url);
+    };
+
+    img.src = url;
   };
 
   // Parse SVG path data
@@ -301,29 +315,33 @@ export default function ThreeDConverter() {
       let currentX = 0;
       let currentY = 0;
       let pointCount = 0;
-      const maxPoints = 1000; // Limit complexity
+      const maxPoints = 500;
 
       for (const cmd of commands) {
         if (pointCount > maxPoints) break;
 
         const type = cmd[0];
-        const args = cmd.slice(1).trim().split(/[\s,]+/).map(Number);
+        const args = cmd.slice(1).trim().split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
 
         switch (type) {
           case 'M':
-            currentX = args[0];
-            currentY = args[1];
-            shape.moveTo(currentX, currentY);
-            pointCount++;
+            if (args.length >= 2) {
+              currentX = args[0];
+              currentY = args[1];
+              shape.moveTo(currentX, currentY);
+              pointCount++;
+            }
             break;
           case 'm':
-            currentX += args[0];
-            currentY += args[1];
-            shape.moveTo(currentX, currentY);
-            pointCount++;
+            if (args.length >= 2) {
+              currentX += args[0];
+              currentY += args[1];
+              shape.moveTo(currentX, currentY);
+              pointCount++;
+            }
             break;
           case 'L':
-            for (let i = 0; i < args.length; i += 2) {
+            for (let i = 0; i < args.length - 1; i += 2) {
               currentX = args[i];
               currentY = args[i + 1];
               shape.lineTo(currentX, currentY);
@@ -331,7 +349,7 @@ export default function ThreeDConverter() {
             }
             break;
           case 'l':
-            for (let i = 0; i < args.length; i += 2) {
+            for (let i = 0; i < args.length - 1; i += 2) {
               currentX += args[i];
               currentY += args[i + 1];
               shape.lineTo(currentX, currentY);
@@ -339,27 +357,35 @@ export default function ThreeDConverter() {
             }
             break;
           case 'H':
-            currentX = args[0];
-            shape.lineTo(currentX, currentY);
-            pointCount++;
+            if (args.length > 0) {
+              currentX = args[0];
+              shape.lineTo(currentX, currentY);
+              pointCount++;
+            }
             break;
           case 'h':
-            currentX += args[0];
-            shape.lineTo(currentX, currentY);
-            pointCount++;
+            if (args.length > 0) {
+              currentX += args[0];
+              shape.lineTo(currentX, currentY);
+              pointCount++;
+            }
             break;
           case 'V':
-            currentY = args[0];
-            shape.lineTo(currentX, currentY);
-            pointCount++;
+            if (args.length > 0) {
+              currentY = args[0];
+              shape.lineTo(currentX, currentY);
+              pointCount++;
+            }
             break;
           case 'v':
-            currentY += args[0];
-            shape.lineTo(currentX, currentY);
-            pointCount++;
+            if (args.length > 0) {
+              currentY += args[0];
+              shape.lineTo(currentX, currentY);
+              pointCount++;
+            }
             break;
           case 'C':
-            for (let i = 0; i < args.length; i += 6) {
+            for (let i = 0; i < args.length - 5; i += 6) {
               shape.bezierCurveTo(
                 args[i], args[i + 1],
                 args[i + 2], args[i + 3],
@@ -371,7 +397,7 @@ export default function ThreeDConverter() {
             }
             break;
           case 'c':
-            for (let i = 0; i < args.length; i += 6) {
+            for (let i = 0; i < args.length - 5; i += 6) {
               shape.bezierCurveTo(
                 currentX + args[i], currentY + args[i + 1],
                 currentX + args[i + 2], currentY + args[i + 3],
@@ -380,6 +406,28 @@ export default function ThreeDConverter() {
               currentX += args[i + 4];
               currentY += args[i + 5];
               pointCount += 3;
+            }
+            break;
+          case 'Q':
+            for (let i = 0; i < args.length - 3; i += 4) {
+              shape.quadraticCurveTo(
+                args[i], args[i + 1],
+                args[i + 2], args[i + 3]
+              );
+              currentX = args[i + 2];
+              currentY = args[i + 3];
+              pointCount += 2;
+            }
+            break;
+          case 'q':
+            for (let i = 0; i < args.length - 3; i += 4) {
+              shape.quadraticCurveTo(
+                currentX + args[i], currentY + args[i + 1],
+                currentX + args[i + 2], currentY + args[i + 3]
+              );
+              currentX += args[i + 2];
+              currentY += args[i + 3];
+              pointCount += 2;
             }
             break;
           case 'Z':
@@ -401,7 +449,6 @@ export default function ThreeDConverter() {
     if (!file) return;
 
     setFileName(file.name);
-    setSourceType('svg');
     const reader = new FileReader();
     reader.onload = (event) => {
       const content = event.target?.result as string;
@@ -414,7 +461,6 @@ export default function ThreeDConverter() {
   const handlePngToSvg = useCallback((svgString: string, name: string) => {
     setSvgContent(svgString);
     setFileName(name);
-    setSourceType('png');
   }, []);
 
   // Export as GLTF
@@ -517,22 +563,20 @@ export default function ThreeDConverter() {
               </div>
 
               {activeTab === 'svg' ? (
-                /* SVG Upload */
                 <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-700 rounded-lg cursor-pointer hover:border-violet-500/50 hover:bg-violet-500/5 transition-all">
                   <svg className="w-8 h-8 text-gray-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
                   <span className="text-sm text-gray-400">
-                    {svgContent && sourceType === 'svg' ? fileName : 'Klik untuk upload SVG'}
+                    {svgContent && activeTab === 'svg' ? fileName : 'Klik untuk upload SVG'}
                   </span>
                   <input type="file" accept=".svg" className="hidden" onChange={handleSvgUpload} />
                 </label>
               ) : (
-                /* PNG to SVG Converter */
                 <PngToSvgConverter onSvgGenerated={handlePngToSvg} />
               )}
 
-              {svgContent && sourceType === 'svg' && (
+              {svgContent && activeTab === 'svg' && (
                 <p className="text-xs text-violet-400 mt-2 truncate">✓ {fileName}</p>
               )}
             </div>
