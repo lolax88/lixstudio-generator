@@ -18,6 +18,7 @@ export default function ThreeDConverter() {
   const [autoRotate, setAutoRotate] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [activeTab, setActiveTab] = useState<'svg' | 'png'>('svg');
+  const [sourceType, setSourceType] = useState<'svg' | 'png'>('svg');
 
   // Initialize Three.js scene
   useEffect(() => {
@@ -45,10 +46,10 @@ export default function ThreeDConverter() {
     rendererRef.current = renderer;
 
     // Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(5, 5, 5);
     scene.add(directionalLight);
 
@@ -99,228 +100,299 @@ export default function ThreeDConverter() {
     if (meshRef.current) {
       sceneRef.current.remove(meshRef.current);
       if (meshRef.current.geometry) meshRef.current.geometry.dispose();
-      if (meshRef.current.material) meshRef.current.material.dispose();
+      if (meshRef.current.material) {
+        if (meshRef.current.material.map) meshRef.current.material.map.dispose();
+        meshRef.current.material.dispose();
+      }
     }
 
-    // Parse SVG and create 3D shape
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgContent, 'image/svg+xml');
-    const paths = doc.querySelectorAll('path, rect, circle, ellipse, polygon, polyline, line');
+    // For PNG-sourced SVGs, use texture approach
+    if (sourceType === 'png') {
+      createTextureMesh(THREE, svgContent);
+    } else {
+      // For direct SVG uploads, try path extrusion first
+      const success = createExtrudedMesh(THREE, svgContent);
+      if (!success) {
+        // Fallback to texture approach
+        createTextureMesh(THREE, svgContent);
+      }
+    }
+  }, [svgContent, depth, bevel, sourceType]);
 
-    // Process SVG paths
-    const shapes: any[] = [];
+  // Create mesh from SVG texture (for PNG conversions)
+  const createTextureMesh = (THREE: any, svgString: string) => {
+    // Render SVG to canvas
+    const canvas = document.createElement('canvas');
+    const size = 512;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
 
-    paths.forEach((path) => {
-      try {
-        if (path.tagName === 'rect') {
-          const x = parseFloat(path.getAttribute('x') || '0');
-          const y = parseFloat(path.getAttribute('y') || '0');
-          const w = parseFloat(path.getAttribute('width') || '10');
-          const h = parseFloat(path.getAttribute('height') || '10');
-          const shape = new THREE.Shape();
-          shape.moveTo(x, y);
-          shape.lineTo(x + w, y);
-          shape.lineTo(x + w, y + h);
-          shape.lineTo(x, y + h);
-          shape.closePath();
-          shapes.push(shape);
-        } else if (path.tagName === 'circle') {
-          const cx = parseFloat(path.getAttribute('cx') || '0');
-          const cy = parseFloat(path.getAttribute('cy') || '0');
-          const r = parseFloat(path.getAttribute('r') || '5');
-          const shape = new THREE.Shape();
-          shape.absarc(cx, cy, r, 0, Math.PI * 2);
-          shapes.push(shape);
-        } else if (path.tagName === 'ellipse') {
-          const cx = parseFloat(path.getAttribute('cx') || '0');
-          const cy = parseFloat(path.getAttribute('cy') || '0');
-          const rx = parseFloat(path.getAttribute('rx') || '5');
-          const ry = parseFloat(path.getAttribute('ry') || '3');
-          const shape = new THREE.Shape();
-          shape.absellipse(cx, cy, rx, ry, 0, Math.PI * 2);
-          shapes.push(shape);
-        } else if (path.tagName === 'path') {
-          const d = path.getAttribute('d');
-          if (d) {
-            const shape = parseSVGPath(THREE, d);
-            if (shape) shapes.push(shape);
-          }
-        } else if (path.tagName === 'polygon' || path.tagName === 'polyline') {
-          const points = path.getAttribute('points');
-          if (points) {
-            const coords = points.trim().split(/[\s,]+/).map(Number);
+    if (!ctx) return;
+
+    // Fill with transparent background
+    ctx.clearRect(0, 0, size, size);
+
+    // Create an image from SVG
+    const img = new window.Image();
+    const svgBlob = new Blob([svgString], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(svgBlob);
+
+    img.onload = () => {
+      // Draw SVG to canvas (centered, maintaining aspect ratio)
+      const scale = Math.min(size / img.width, size / img.height) * 0.8;
+      const x = (size - img.width * scale) / 2;
+      const y = (size - img.height * scale) / 2;
+      ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+
+      // Create texture from canvas
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+
+      // Create a box with the texture
+      const geometry = new THREE.BoxGeometry(3, 3, depth);
+      const materials = [
+        new THREE.MeshPhongMaterial({ color: 0x8b5cf6 }), // right
+        new THREE.MeshPhongMaterial({ color: 0x8b5cf6 }), // left
+        new THREE.MeshPhongMaterial({ color: 0x8b5cf6 }), // top
+        new THREE.MeshPhongMaterial({ color: 0x8b5cf6 }), // bottom
+        new THREE.MeshPhongMaterial({ map: texture, transparent: true }), // front
+        new THREE.MeshPhongMaterial({ map: texture, transparent: true }), // back
+      ];
+
+      const mesh = new THREE.Mesh(geometry, materials);
+      sceneRef.current.add(mesh);
+      meshRef.current = mesh;
+
+      // Reset camera
+      if (cameraRef.current) {
+        cameraRef.current.position.set(0, 0, 5);
+        cameraRef.current.lookAt(0, 0, 0);
+      }
+
+      URL.revokeObjectURL(url);
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      // Fallback: create simple extruded shape
+      createFallbackMesh(THREE);
+    };
+
+    img.src = url;
+  };
+
+  // Create extruded mesh from SVG paths (for direct SVG uploads)
+  const createExtrudedMesh = (THREE: any, svgString: string): boolean => {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgString, 'image/svg+xml');
+      const paths = doc.querySelectorAll('path, rect, circle, ellipse, polygon');
+
+      const shapes: any[] = [];
+
+      paths.forEach((path) => {
+        try {
+          if (path.tagName === 'rect') {
+            const x = parseFloat(path.getAttribute('x') || '0');
+            const y = parseFloat(path.getAttribute('y') || '0');
+            const w = parseFloat(path.getAttribute('width') || '10');
+            const h = parseFloat(path.getAttribute('height') || '10');
             const shape = new THREE.Shape();
-            if (coords.length >= 2) {
-              shape.moveTo(coords[0], coords[1]);
-              for (let i = 2; i < coords.length; i += 2) {
-                shape.lineTo(coords[i], coords[i + 1]);
-              }
-              if (path.tagName === 'polygon') shape.closePath();
-              shapes.push(shape);
+            shape.moveTo(x, y);
+            shape.lineTo(x + w, y);
+            shape.lineTo(x + w, y + h);
+            shape.lineTo(x, y + h);
+            shape.closePath();
+            shapes.push(shape);
+          } else if (path.tagName === 'circle') {
+            const cx = parseFloat(path.getAttribute('cx') || '0');
+            const cy = parseFloat(path.getAttribute('cy') || '0');
+            const r = parseFloat(path.getAttribute('r') || '5');
+            const shape = new THREE.Shape();
+            shape.absarc(cx, cy, r, 0, Math.PI * 2);
+            shapes.push(shape);
+          } else if (path.tagName === 'path') {
+            const d = path.getAttribute('d');
+            if (d) {
+              const shape = parseSVGPath(THREE, d);
+              if (shape) shapes.push(shape);
             }
           }
+        } catch (e) {
+          // Skip invalid paths
         }
-      } catch (e) {
-        // Skip invalid paths
+      });
+
+      if (shapes.length === 0) return false;
+
+      const group = new THREE.Group();
+      const material = new THREE.MeshPhongMaterial({
+        color: 0x8b5cf6,
+        specular: 0x333333,
+        shininess: 30,
+      });
+
+      const extrudeSettings = {
+        depth: depth,
+        bevelEnabled: true,
+        bevelThickness: bevel,
+        bevelSize: bevel,
+        bevelSegments: 3,
+      };
+
+      let hasValidMesh = false;
+      shapes.forEach((shape) => {
+        try {
+          const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+          const mesh = new THREE.Mesh(geometry, material.clone());
+          group.add(mesh);
+          hasValidMesh = true;
+        } catch (e) {
+          // Skip shapes that fail to extrude
+        }
+      });
+
+      if (!hasValidMesh) return false;
+
+      const box = new THREE.Box3().setFromObject(group);
+      const center = box.getCenter(new THREE.Vector3());
+      group.position.sub(center);
+
+      sceneRef.current.add(group);
+      meshRef.current = group;
+
+      if (cameraRef.current) {
+        cameraRef.current.position.set(0, 0, 5);
+        cameraRef.current.lookAt(0, 0, 0);
       }
-    });
 
-    if (shapes.length === 0) {
-      // Fallback: create a simple shape
-      const shape = new THREE.Shape();
-      shape.moveTo(-1, -1);
-      shape.lineTo(1, -1);
-      shape.lineTo(1, 1);
-      shape.lineTo(-1, 1);
-      shape.closePath();
-      shapes.push(shape);
+      return true;
+    } catch (e) {
+      return false;
     }
+  };
 
-    // Create extruded geometry
-    const group = new THREE.Group();
+  // Fallback mesh
+  const createFallbackMesh = (THREE: any) => {
+    const geometry = new THREE.BoxGeometry(2, 2, depth);
     const material = new THREE.MeshPhongMaterial({
       color: 0x8b5cf6,
       specular: 0x333333,
       shininess: 30,
     });
+    const mesh = new THREE.Mesh(geometry, material);
+    sceneRef.current.add(mesh);
+    meshRef.current = mesh;
 
-    const extrudeSettings = {
-      depth: depth,
-      bevelEnabled: true,
-      bevelThickness: bevel,
-      bevelSize: bevel,
-      bevelSegments: 3,
-    };
-
-    shapes.forEach((shape) => {
-      try {
-        const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-        const mesh = new THREE.Mesh(geometry, material.clone());
-        group.add(mesh);
-      } catch (e) {
-        // Skip shapes that fail to extrude
-      }
-    });
-
-    // Center the group
-    const box = new THREE.Box3().setFromObject(group);
-    const center = box.getCenter(new THREE.Vector3());
-    group.position.sub(center);
-
-    sceneRef.current.add(group);
-    meshRef.current = group;
-
-    // Reset camera
     if (cameraRef.current) {
       cameraRef.current.position.set(0, 0, 5);
       cameraRef.current.lookAt(0, 0, 0);
     }
-  }, [svgContent, depth, bevel]);
+  };
 
   // Parse SVG path data
   const parseSVGPath = (THREE: any, d: string): any => {
-    const shape = new THREE.Shape();
-    const commands = d.match(/[MmLlHhVvCcSsQqTtAaZz][^MmLlHhVvCcSsQqTtAaZz]*/g);
-    if (!commands) return null;
+    try {
+      const shape = new THREE.Shape();
+      const commands = d.match(/[MmLlHhVvCcSsQqTtAaZz][^MmLlHhVvCcSsQqTtAaZz]*/g);
+      if (!commands) return null;
 
-    let currentX = 0;
-    let currentY = 0;
+      let currentX = 0;
+      let currentY = 0;
+      let pointCount = 0;
+      const maxPoints = 1000; // Limit complexity
 
-    for (const cmd of commands) {
-      const type = cmd[0];
-      const args = cmd.slice(1).trim().split(/[\s,]+/).map(Number);
+      for (const cmd of commands) {
+        if (pointCount > maxPoints) break;
 
-      switch (type) {
-        case 'M':
-          currentX = args[0];
-          currentY = args[1];
-          shape.moveTo(currentX, currentY);
-          break;
-        case 'm':
-          currentX += args[0];
-          currentY += args[1];
-          shape.moveTo(currentX, currentY);
-          break;
-        case 'L':
-          for (let i = 0; i < args.length; i += 2) {
-            currentX = args[i];
-            currentY = args[i + 1];
+        const type = cmd[0];
+        const args = cmd.slice(1).trim().split(/[\s,]+/).map(Number);
+
+        switch (type) {
+          case 'M':
+            currentX = args[0];
+            currentY = args[1];
+            shape.moveTo(currentX, currentY);
+            pointCount++;
+            break;
+          case 'm':
+            currentX += args[0];
+            currentY += args[1];
+            shape.moveTo(currentX, currentY);
+            pointCount++;
+            break;
+          case 'L':
+            for (let i = 0; i < args.length; i += 2) {
+              currentX = args[i];
+              currentY = args[i + 1];
+              shape.lineTo(currentX, currentY);
+              pointCount++;
+            }
+            break;
+          case 'l':
+            for (let i = 0; i < args.length; i += 2) {
+              currentX += args[i];
+              currentY += args[i + 1];
+              shape.lineTo(currentX, currentY);
+              pointCount++;
+            }
+            break;
+          case 'H':
+            currentX = args[0];
             shape.lineTo(currentX, currentY);
-          }
-          break;
-        case 'l':
-          for (let i = 0; i < args.length; i += 2) {
-            currentX += args[i];
-            currentY += args[i + 1];
+            pointCount++;
+            break;
+          case 'h':
+            currentX += args[0];
             shape.lineTo(currentX, currentY);
-          }
-          break;
-        case 'H':
-          currentX = args[0];
-          shape.lineTo(currentX, currentY);
-          break;
-        case 'h':
-          currentX += args[0];
-          shape.lineTo(currentX, currentY);
-          break;
-        case 'V':
-          currentY = args[0];
-          shape.lineTo(currentX, currentY);
-          break;
-        case 'v':
-          currentY += args[0];
-          shape.lineTo(currentX, currentY);
-          break;
-        case 'C':
-          for (let i = 0; i < args.length; i += 6) {
-            shape.bezierCurveTo(
-              args[i], args[i + 1],
-              args[i + 2], args[i + 3],
-              args[i + 4], args[i + 5]
-            );
-            currentX = args[i + 4];
-            currentY = args[i + 5];
-          }
-          break;
-        case 'c':
-          for (let i = 0; i < args.length; i += 6) {
-            shape.bezierCurveTo(
-              currentX + args[i], currentY + args[i + 1],
-              currentX + args[i + 2], currentY + args[i + 3],
-              currentX + args[i + 4], currentY + args[i + 5]
-            );
-            currentX += args[i + 4];
-            currentY += args[i + 5];
-          }
-          break;
-        case 'Q':
-          for (let i = 0; i < args.length; i += 4) {
-            shape.quadraticCurveTo(
-              args[i], args[i + 1],
-              args[i + 2], args[i + 3]
-            );
-            currentX = args[i + 2];
-            currentY = args[i + 3];
-          }
-          break;
-        case 'q':
-          for (let i = 0; i < args.length; i += 4) {
-            shape.quadraticCurveTo(
-              currentX + args[i], currentY + args[i + 1],
-              currentX + args[i + 2], currentY + args[i + 3]
-            );
-            currentX += args[i + 2];
-            currentY += args[i + 3];
-          }
-          break;
-        case 'Z':
-        case 'z':
-          shape.closePath();
-          break;
+            pointCount++;
+            break;
+          case 'V':
+            currentY = args[0];
+            shape.lineTo(currentX, currentY);
+            pointCount++;
+            break;
+          case 'v':
+            currentY += args[0];
+            shape.lineTo(currentX, currentY);
+            pointCount++;
+            break;
+          case 'C':
+            for (let i = 0; i < args.length; i += 6) {
+              shape.bezierCurveTo(
+                args[i], args[i + 1],
+                args[i + 2], args[i + 3],
+                args[i + 4], args[i + 5]
+              );
+              currentX = args[i + 4];
+              currentY = args[i + 5];
+              pointCount += 3;
+            }
+            break;
+          case 'c':
+            for (let i = 0; i < args.length; i += 6) {
+              shape.bezierCurveTo(
+                currentX + args[i], currentY + args[i + 1],
+                currentX + args[i + 2], currentY + args[i + 3],
+                currentX + args[i + 4], currentY + args[i + 5]
+              );
+              currentX += args[i + 4];
+              currentY += args[i + 5];
+              pointCount += 3;
+            }
+            break;
+          case 'Z':
+          case 'z':
+            shape.closePath();
+            break;
+        }
       }
-    }
 
-    return shape;
+      return shape;
+    } catch (e) {
+      return null;
+    }
   };
 
   // Handle SVG file upload
@@ -329,6 +401,7 @@ export default function ThreeDConverter() {
     if (!file) return;
 
     setFileName(file.name);
+    setSourceType('svg');
     const reader = new FileReader();
     reader.onload = (event) => {
       const content = event.target?.result as string;
@@ -341,6 +414,7 @@ export default function ThreeDConverter() {
   const handlePngToSvg = useCallback((svgString: string, name: string) => {
     setSvgContent(svgString);
     setFileName(name);
+    setSourceType('png');
   }, []);
 
   // Export as GLTF
@@ -449,7 +523,7 @@ export default function ThreeDConverter() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
                   <span className="text-sm text-gray-400">
-                    {activeTab === 'svg' && svgContent ? fileName : 'Klik untuk upload SVG'}
+                    {svgContent && sourceType === 'svg' ? fileName : 'Klik untuk upload SVG'}
                   </span>
                   <input type="file" accept=".svg" className="hidden" onChange={handleSvgUpload} />
                 </label>
@@ -458,7 +532,7 @@ export default function ThreeDConverter() {
                 <PngToSvgConverter onSvgGenerated={handlePngToSvg} />
               )}
 
-              {svgContent && activeTab === 'svg' && (
+              {svgContent && sourceType === 'svg' && (
                 <p className="text-xs text-violet-400 mt-2 truncate">✓ {fileName}</p>
               )}
             </div>
