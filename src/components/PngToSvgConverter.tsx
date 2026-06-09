@@ -3,6 +3,34 @@
 import { useState, useCallback, useRef } from 'react';
 import ImageTracer from 'imagetracerjs';
 
+/**
+ * Sanitize SVG content to prevent XSS attacks.
+ * Removes script tags, event handlers, and dangerous attributes.
+ */
+function sanitizeSvg(svg: string): string {
+  return svg
+    // Add responsive sizing to root SVG tag
+    .replace(/<svg[^>]*>/, (match) => {
+      // Remove any event handlers from the SVG tag
+      const clean = match.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
+      return clean.replace(/>$/, ' style="max-width:100%;max-height:100%">');
+    })
+    // Remove script tags and their content
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    // Remove event handler attributes (onclick, onload, onerror, etc.)
+    .replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/\s+on\w+\s*=\s*[^\s>]*/gi, '')
+    // Remove javascript: protocol in href/xlink:href
+    .replace(/(?:href|xlink:href)\s*=\s*["']javascript:[^"']*["']/gi, '')
+    // Remove data: protocol in href (can contain scripts)
+    .replace(/href\s*=\s*["']data:[^"']*["']/gi, '')
+    // Remove <foreignObject> which can embed HTML
+    .replace(/<foreignObject\b[^<]*(?:(?!<\/foreignObject>)<[^<]*)*<\/foreignObject>/gi, '')
+    // Remove <use> tags that could reference external resources
+    .replace(/<use\b[^>]*\/>/gi, '')
+    .replace(/<use\b[^<]*(?:(?!<\/use>)<[^<]*)*<\/use>/gi, '');
+}
+
 interface PngToSvgConverterProps {
   onSvgGenerated: (svgContent: string, fileName: string) => void;
 }
@@ -223,7 +251,7 @@ export default function PngToSvgConverter({ onSvgGenerated }: PngToSvgConverterP
             </div>
             <div
               className="w-full h-32 flex items-center justify-center bg-white/5 rounded overflow-hidden"
-              dangerouslySetInnerHTML={{ __html: svgPreview.replace(/<svg[^>]*>/, '<svg style="max-width:100%;max-height:100%">') }}
+              dangerouslySetInnerHTML={{ __html: sanitizeSvg(svgPreview) }}
             />
           </div>
 
