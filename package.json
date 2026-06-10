@@ -11,7 +11,6 @@
   "dependencies": {
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
-    "@types/three": "^0.184.1",
     "@vercel/analytics": "^2.0.1",
     "clsx": "^2.1.1",
     "imagetracerjs": "^1.2.6",
@@ -26,6 +25,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.172.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",

@@ -106,7 +106,7 @@ function analyzeSVG(svgContent: string): {
       if (strokeMatch) entry.stroke = strokeMatch[1];
 
       const swMatch = props.match(/stroke-width:\s*([^;}\s]+)/);
-      if (swMatch) entry.sw = swMatch[1] as any;
+      if (swMatch) entry.strokeWidth = swMatch[1];
 
       styleMap[className] = entry;
     }
@@ -138,8 +138,8 @@ function analyzeSVG(svgContent: string): {
         stroke = classStyle.stroke;
         isClassBased = true;
       }
-      if (classStyle.sw && !strokeWidth) {
-        strokeWidth = parseFloat(classStyle.sw as string);
+      if (classStyle.strokeWidth && !strokeWidth) {
+        strokeWidth = parseFloat(classStyle.strokeWidth);
         isClassBased = true;
       }
     }
@@ -248,7 +248,7 @@ function analyzeSVG(svgContent: string): {
 }
 
 // === SVG PATH PARSER ===
-function parseSVGPath(d: string): THREE.Shape | null {
+function parseSVGPath(d: string): any {
   const shape = new THREE.Shape();
   const commands = d.match(/[MmLlHhVvCcSsQqTtAaZz][^MmLlHhVvCcSsQqTtAaZz]*/g);
   if (!commands) return null;
@@ -340,11 +340,11 @@ function parseSVGPath(d: string): THREE.Shape | null {
 }
 
 // === UTILITY ===
-function hexToColor(hex: string): THREE.Color {
+function hexToColor(hex: string): any {
   try { return new THREE.Color(hex); } catch { return new THREE.Color('#8B5CF6'); }
 }
 
-function createGradientTexture(color1: string, color2: string, angle: number): THREE.Texture {
+function createGradientTexture(color1: string, color2: string, angle: number): any {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 512;
@@ -384,11 +384,11 @@ export default function SVGToThree({
   bgAngle = 135,
 }: SVGToThreeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<any | null>(null);
+  const cameraRef = useRef<any | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
-  const modelGroupRef = useRef<THREE.Group | null>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
+  const modelGroupRef = useRef<any | null>(null);
+  const sceneRef = useRef<any | null>(null);
   const animationRef = useRef<number>(0);
 
   const [autoRotate, setAutoRotate] = useState(true);
@@ -500,8 +500,8 @@ export default function SVGToThree({
       // Grid
       const gridHelper = new THREE.GridHelper(500, 10, 0x222244, 0x1a1a33);
       gridHelper.position.y = -1;
-      (gridHelper.material as THREE.Material).transparent = true;
-      (gridHelper.material as THREE.Material).opacity = 0.3;
+      (gridHelper.material as any).transparent = true;
+      (gridHelper.material as any).opacity = 0.3;
       scene.add(gridHelper);
 
       // === ANALYZE SVG & BUILD 3D ===
@@ -606,7 +606,7 @@ export default function SVGToThree({
         }
 
         // Extrude
-        const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+        const extrudeSettings: any = {
           depth: extrudeDepth,
           bevelEnabled: useBevel,
           bevelThickness: useBevel ? extrudeDepth * 0.15 : 0,
