@@ -1,171 +1,73 @@
 'use client';
 
-import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-interface SVGToThreeProps {
+// === TYPES ===
+export type RenderMode = 'smart' | 'filled' | 'outline' | 'wireframe';
+export type BgType = 'gradient' | 'solid' | 'transparent';
+
+export interface MaterialPreset {
+  name: string;
+  color: string;
+  metalness: number;
+  roughness: number;
+  label: string;
+}
+
+export interface SVGToThreeProps {
   svgContent: string;
   depth?: number;
   bevelEnabled?: boolean;
-  onExportGLTF?: () => void;
-  onExportOBJ?: () => void;
+  renderMode?: RenderMode;
+  materialPreset?: MaterialPreset;
+  customColor?: string;
+  metalness?: number;
+  roughness?: number;
+  lightIntensity?: number;
+  lightColor?: string;
+  bgType?: BgType;
+  bgColors?: string[];
+  bgAngle?: number;
 }
 
-// Parse SVG path d attribute to THREE.Shape
-function parseSVGPath(d: string): any {
-  const shape = new THREE.Shape();
-  const commands = d.match(/[MmLlHhVvCcSsQqTtAaZz][^MmLlHhVvCcSsQqTtAaZz]*/g);
-  if (!commands) return null;
+// === MATERIAL PRESETS ===
+export const MATERIAL_PRESETS: MaterialPreset[] = [
+  { name: 'custom', color: '#8B5CF6', metalness: 0.1, roughness: 0.4, label: '🎨 Custom' },
+  { name: 'gold', color: '#FFD700', metalness: 0.9, roughness: 0.2, label: '🥇 Gold' },
+  { name: 'silver', color: '#C0C0C0', metalness: 0.9, roughness: 0.15, label: '🥈 Silver' },
+  { name: 'copper', color: '#B87333', metalness: 0.85, roughness: 0.25, label: '🥉 Copper' },
+  { name: 'chrome', color: '#E8E8E8', metalness: 1.0, roughness: 0.05, label: '✨ Chrome' },
+  { name: 'plastic', color: '#FF6B9D', metalness: 0.0, roughness: 0.5, label: '🩷 Plastic' },
+  { name: 'wood', color: '#8B6914', metalness: 0.0, roughness: 0.8, label: '🪵 Wood' },
+  { name: 'glass', color: '#88CCFF', metalness: 0.1, roughness: 0.05, label: '💎 Glass' },
+  { name: 'matte', color: '#333333', metalness: 0.0, roughness: 1.0, label: '⬛ Matte' },
+  { name: 'neon', color: '#00FF88', metalness: 0.3, roughness: 0.2, label: '💚 Neon' },
+];
 
-  let currentX = 0;
-  let currentY = 0;
-  let startX = 0;
-  let startY = 0;
-  let firstMove = true;
+// === SVG ANALYSIS ALGORITHM ===
+// Deteksi mana path yang ada isinya (filled) vs outline aja
 
-  for (const cmd of commands) {
-    const type = cmd[0];
-    const nums = cmd.slice(1).trim().match(/-?[\d.]+/g)?.map(Number) || [];
-
-    switch (type) {
-      case 'M':
-        if (nums.length >= 2) {
-          currentX = nums[0];
-          currentY = nums[1];
-          if (firstMove) {
-            shape.moveTo(currentX, currentY);
-            firstMove = false;
-          } else {
-            shape.moveTo(currentX, currentY);
-          }
-          startX = currentX;
-          startY = currentY;
-        }
-        break;
-      case 'm':
-        if (nums.length >= 2) {
-          currentX += nums[0];
-          currentY += nums[1];
-          if (firstMove) {
-            shape.moveTo(currentX, currentY);
-            firstMove = false;
-          } else {
-            shape.moveTo(currentX, currentY);
-          }
-          startX = currentX;
-          startY = currentY;
-        }
-        break;
-      case 'L':
-        for (let i = 0; i < nums.length - 1; i += 2) {
-          shape.lineTo(nums[i], nums[i + 1]);
-          currentX = nums[i];
-          currentY = nums[i + 1];
-        }
-        break;
-      case 'l':
-        for (let i = 0; i < nums.length - 1; i += 2) {
-          currentX += nums[i];
-          currentY += nums[i + 1];
-          shape.lineTo(currentX, currentY);
-        }
-        break;
-      case 'H':
-        for (const n of nums) {
-          shape.lineTo(n, currentY);
-          currentX = n;
-        }
-        break;
-      case 'h':
-        for (const n of nums) {
-          currentX += n;
-          shape.lineTo(currentX, currentY);
-        }
-        break;
-      case 'V':
-        for (const n of nums) {
-          shape.lineTo(currentX, n);
-          currentY = n;
-        }
-        break;
-      case 'v':
-        for (const n of nums) {
-          currentY += n;
-          shape.lineTo(currentX, currentY);
-        }
-        break;
-      case 'C':
-        for (let i = 0; i < nums.length - 4; i += 6) {
-          shape.bezierCurveTo(
-            nums[i], nums[i + 1],
-            nums[i + 2], nums[i + 3],
-            nums[i + 4], nums[i + 5]
-          );
-          currentX = nums[i + 4];
-          currentY = nums[i + 5];
-        }
-        break;
-      case 'c':
-        for (let i = 0; i < nums.length - 4; i += 6) {
-          shape.bezierCurveTo(
-            currentX + nums[i], currentY + nums[i + 1],
-            currentX + nums[i + 2], currentY + nums[i + 3],
-            currentX + nums[i + 4], currentY + nums[i + 5]
-          );
-          currentX += nums[i + 4];
-          currentY += nums[i + 5];
-        }
-        break;
-      case 'Q':
-        for (let i = 0; i < nums.length - 2; i += 4) {
-          shape.quadraticCurveTo(
-            nums[i], nums[i + 1],
-            nums[i + 2], nums[i + 3]
-          );
-          currentX = nums[i + 2];
-          currentY = nums[i + 3];
-        }
-        break;
-      case 'q':
-        for (let i = 0; i < nums.length - 2; i += 4) {
-          shape.quadraticCurveTo(
-            currentX + nums[i], currentY + nums[i + 1],
-            currentX + nums[i + 2], currentY + nums[i + 3]
-          );
-          currentX += nums[i + 2];
-          currentY += nums[i + 3];
-        }
-        break;
-      case 'Z':
-      case 'z':
-        shape.lineTo(startX, startY);
-        currentX = startX;
-        currentY = startY;
-        break;
-      case 'A':
-      case 'a':
-        // Arc - approximate with lines
-        if (nums.length >= 7) {
-          const ex = type === 'A' ? nums[5] : currentX + nums[5];
-          const ey = type === 'A' ? nums[6] : currentY + nums[6];
-          shape.lineTo(ex, ey);
-          currentX = ex;
-          currentY = ey;
-        }
-        break;
-    }
-  }
-
-  return shape;
+interface AnalyzedPath {
+  d: string;
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+  isFilled: boolean;    // Ada isi (fill bukan none/transparent)
+  isOutline: boolean;   // Cuma garis (stroke doang)
+  isClassBased: boolean;
 }
 
-// Parse SVG and extract paths with colors
-function parseSVG(svgContent: string): { paths: { d: string; fill: string }[]; viewBox: { x: number; y: number; width: number; height: number } } {
+function analyzeSVG(svgContent: string): {
+  paths: AnalyzedPath[];
+  viewBox: { x: number; y: number; width: number; height: number };
+  hasStyleBlock: boolean;
+} {
   const parser = new DOMParser();
   const doc = parser.parseFromString(svgContent, 'image/svg+xml');
   const svg = doc.querySelector('svg');
-  
+
   // Get viewBox
   let viewBox = { x: 0, y: 0, width: 100, height: 100 };
   if (svg) {
@@ -182,159 +84,326 @@ function parseSVG(svgContent: string): { paths: { d: string; fill: string }[]; v
     }
   }
 
-  const paths: { d: string; fill: string }[] = [];
+  // Parse style block for class-based fills
+  const styleEl = doc.querySelector('style');
+  const hasStyleBlock = !!styleEl;
+  const styleMap: Record<string, { fill?: string; stroke?: string; strokeWidth?: string }> = {};
 
-  // Get all path elements
+  if (styleEl) {
+    const styleText = styleEl.textContent || '';
+    // Parse CSS rules like .cls-1{fill:#d4712a}
+    const ruleRegex = /\.([^{]+)\{([^}]+)\}/g;
+    let match;
+    while ((match = ruleRegex.exec(styleText)) !== null) {
+      const className = match[1].trim();
+      const props = match[2];
+      const entry: { fill?: string; stroke?: string; strokeWidth?: string } = {};
+
+      const fillMatch = props.match(/fill:\s*([^;}\s]+)/);
+      if (fillMatch) entry.fill = fillMatch[1];
+
+      const strokeMatch = props.match(/stroke:\s*([^;}\s]+)/);
+      if (strokeMatch) entry.stroke = strokeMatch[1];
+
+      const swMatch = props.match(/stroke-width:\s*([^;}\s]+)/);
+      if (swMatch) entry.sw = swMatch[1] as any;
+
+      styleMap[className] = entry;
+    }
+  }
+
+  const analyzedPaths: AnalyzedPath[] = [];
+
+  // Analyze all path elements
   const pathElements = doc.querySelectorAll('path');
   pathElements.forEach((path) => {
     const d = path.getAttribute('d');
-    if (d) {
-      let fill = path.getAttribute('fill') || '#000000';
-      if (fill === 'none') fill = '#000000';
-      
-      // Check for class-based fill
-      const className = path.getAttribute('class');
-      if (className) {
-        const styleMatch = svgContent.match(new RegExp(`\\.${className}\\s*\\{[^}]*fill:\\s*([^;\\s]+)`));
-        if (styleMatch) fill = styleMatch[1];
+    if (!d) return;
+
+    // Get fill from attribute or class
+    let fill = path.getAttribute('fill') || '';
+    let stroke = path.getAttribute('stroke') || '';
+    let strokeWidth = parseFloat(path.getAttribute('stroke-width') || '0');
+
+    // Check class-based styles
+    const className = path.getAttribute('class');
+    let isClassBased = false;
+    if (className && styleMap[className]) {
+      const classStyle = styleMap[className];
+      if (classStyle.fill && !fill) {
+        fill = classStyle.fill;
+        isClassBased = true;
       }
-      
-      // Note: path transforms are complex to apply to d attribute
-      // For now we'll rely on the shape being positioned correctly
-      // Complex transforms would need a full SVG path transform library
-      
-      paths.push({ d, fill });
+      if (classStyle.stroke && !stroke) {
+        stroke = classStyle.stroke;
+        isClassBased = true;
+      }
+      if (classStyle.sw && !strokeWidth) {
+        strokeWidth = parseFloat(classStyle.sw as string);
+        isClassBased = true;
+      }
     }
+
+    // Also check inline style
+    const style = path.getAttribute('style') || '';
+    if (style) {
+      const styleFillMatch = style.match(/fill:\s*([^;}\s]+)/);
+      if (styleFillMatch && !fill) fill = styleFillMatch[1];
+
+      const styleStrokeMatch = style.match(/stroke:\s*([^;}\s]+)/);
+      if (styleStrokeMatch && !stroke) stroke = styleStrokeMatch[1];
+
+      const styleSWMatch = style.match(/stroke-width:\s*([^;}\s]+)/);
+      if (styleSWMatch && !strokeWidth) strokeWidth = parseFloat(styleSWMatch[1]);
+    }
+
+    // === ALGORITHM: Tentuin mana yang ada isinya ===
+    // isFilled = path punya fill yang bukan "none" atau "transparent"
+    const isFilled = !!fill &&
+      fill !== 'none' &&
+      fill !== 'transparent' &&
+      fill !== 'rgba(0,0,0,0)' &&
+      fill !== '#00000000';
+
+    // isOutline = path cuma punya stroke, gak punya fill
+    const isOutline = !isFilled && !!stroke && stroke !== 'none';
+
+    analyzedPaths.push({
+      d,
+      fill: fill || '#8B5CF6', // Default purple kalau gak ada fill
+      stroke: stroke || fill || '#8B5CF6',
+      strokeWidth: strokeWidth || 2,
+      isFilled,
+      isOutline,
+      isClassBased,
+    });
   });
 
-  // Helper: parse transform attribute
-  function parseTransform(transformStr: string): { tx: number; ty: number; rotate: number; sx: number; sy: number } {
-    const result = { tx: 0, ty: 0, rotate: 0, sx: 1, sy: 1 };
-    if (!transformStr) return result;
-    
-    const translateMatch = transformStr.match(/translate\(([^)]+)\)/);
-    if (translateMatch) {
-      const parts = translateMatch[1].split(/[\s,]+/).map(Number);
-      result.tx = parts[0] || 0;
-      result.ty = parts[1] || 0;
-    }
-    
-    const rotateMatch = transformStr.match(/rotate\(([^)]+)\)/);
-    if (rotateMatch) {
-      result.rotate = parseFloat(rotateMatch[1]) || 0;
-    }
-    
-    const scaleMatch = transformStr.match(/scale\(([^)]+)\)/);
-    if (scaleMatch) {
-      const parts = scaleMatch[1].split(/[\s,]+/).map(Number);
-      result.sx = parts[0] || 1;
-      result.sy = parts[1] || parts[0] || 1;
-    }
-    
-    return result;
-  }
-
-  // Helper: apply transform to point
-  function applyTransform(x: number, y: number, transform: { tx: number; ty: number; rotate: number; sx: number; sy: number }): { x: number; y: number } {
-    // Scale
-    let nx = x * transform.sx;
-    let ny = y * transform.sy;
-    
-    // Rotate (around origin)
-    if (transform.rotate !== 0) {
-      const rad = (transform.rotate * Math.PI) / 180;
-      const cos = Math.cos(rad);
-      const sin = Math.sin(rad);
-      const rx = nx * cos - ny * sin;
-      const ry = nx * sin + ny * cos;
-      nx = rx;
-      ny = ry;
-    }
-    
-    // Translate
-    nx += transform.tx;
-    ny += transform.ty;
-    
-    return { x: nx, y: ny };
-  }
-
-  // Get all rect elements
+  // Also analyze rect, circle, ellipse elements
   const rectElements = doc.querySelectorAll('rect');
   rectElements.forEach((rect) => {
     const x = parseFloat(rect.getAttribute('x') || '0');
     const y = parseFloat(rect.getAttribute('y') || '0');
     const w = parseFloat(rect.getAttribute('width') || '0');
     const h = parseFloat(rect.getAttribute('height') || '0');
-    if (w > 0 && h > 0) {
-      const transform = parseTransform(rect.getAttribute('transform') || '');
-      
-      // Create rect corners
-      const corners = [
-        { x: x, y: y },
-        { x: x + w, y: y },
-        { x: x + w, y: y + h },
-        { x: x, y: y + h },
-      ];
-      
-      // Apply transform to corners
-      const transformedCorners = corners.map(c => applyTransform(c.x, c.y, transform));
-      
-      // Create path from transformed corners
-      const d = `M${transformedCorners[0].x},${transformedCorners[0].y} L${transformedCorners[1].x},${transformedCorners[1].y} L${transformedCorners[2].x},${transformedCorners[2].y} L${transformedCorners[3].x},${transformedCorners[3].y} Z`;
-      
-      let fill = rect.getAttribute('fill') || '#000000';
-      if (fill === 'none') fill = '#000000';
-      
-      // Check for class-based fill
-      const className = rect.getAttribute('class');
-      if (className) {
-        const styleMatch = svgContent.match(new RegExp(`\\.${className}\\s*\\{[^}]*fill:\\s*([^;\\s]+)`));
-        if (styleMatch) fill = styleMatch[1];
-      }
-      
-      paths.push({ d, fill });
+    if (w <= 0 || h <= 0) return;
+
+    const transform = rect.getAttribute('transform') || '';
+    const tx = transform.match(/translate\(([^)]+)\)/)?.[1]?.split(/[\s,]+/).map(Number) || [0, 0];
+    const rotate = parseFloat(transform.match(/rotate\(([^)]+)\)/)?.[1] || '0');
+
+    let nx = x + tx[0], ny = y + tx[1];
+    const d = `M${nx},${ny} L${nx+w},${ny} L${nx+w},${ny+h} L${nx},${ny+h} Z`;
+
+    let fill = rect.getAttribute('fill') || '';
+    const className = rect.getAttribute('class');
+    if (className && styleMap[className]?.fill) {
+      fill = styleMap[className].fill!;
     }
+
+    const isFilled = !!fill && fill !== 'none' && fill !== 'transparent';
+
+    analyzedPaths.push({
+      d,
+      fill: fill || '#8B5CF6',
+      stroke: fill || '#8B5CF6',
+      strokeWidth: 2,
+      isFilled,
+      isOutline: false,
+      isClassBased: !!className,
+    });
   });
 
-  // Get all circle elements
-  const circleElements = doc.querySelectorAll('circle');
-  circleElements.forEach((circle) => {
-    const cx = parseFloat(circle.getAttribute('cx') || '0');
-    const cy = parseFloat(circle.getAttribute('cy') || '0');
-    const r = parseFloat(circle.getAttribute('r') || '0');
-    if (r > 0) {
-      // Approximate circle with bezier curves
-      const k = r * 0.5523;
-      const d = `M${cx-r},${cy} C${cx-r},${cy-k} ${cx-k},${cy-r} ${cx},${cy-r} C${cx+k},${cy-r} ${cx+r},${cy-k} ${cx+r},${cy} C${cx+r},${cy+k} ${cx+k},${cy+r} ${cx},${cy+r} C${cx-k},${cy+r} ${cx-r},${cy+k} ${cx-r},${cy} Z`;
-      let fill = circle.getAttribute('fill') || '#000000';
-      if (fill === 'none') fill = '#000000';
-      paths.push({ d, fill });
+  const circleElements = doc.querySelectorAll('circle, ellipse');
+  circleElements.forEach((el) => {
+    const cx = parseFloat(el.getAttribute('cx') || '0');
+    const cy = parseFloat(el.getAttribute('cy') || '0');
+    const rx = parseFloat(el.getAttribute('r') || el.getAttribute('rx') || '0');
+    const ry = parseFloat(el.getAttribute('ry') || String(rx));
+    if (rx <= 0) return;
+
+    const kx = rx * 0.5523, ky = ry * 0.5523;
+    const d = `M${cx-rx},${cy} C${cx-rx},${cy-ky} ${cx-kx},${cy-ry} ${cx},${cy-ry} C${cx+kx},${cy-ry} ${cx+rx},${cy-ky} ${cx+rx},${cy} C${cx+rx},${cy+ky} ${cx+kx},${cy+ry} ${cx},${cy+ry} C${cx-kx},${cy+ry} ${cx-rx},${cy+ky} ${cx-rx},${cy} Z`;
+
+    let fill = el.getAttribute('fill') || '';
+    const className = el.getAttribute('class');
+    if (className && styleMap[className]?.fill) {
+      fill = styleMap[className].fill!;
     }
+
+    const isFilled = !!fill && fill !== 'none' && fill !== 'transparent';
+
+    analyzedPaths.push({
+      d,
+      fill: fill || '#8B5CF6',
+      stroke: fill || '#8B5CF6',
+      strokeWidth: 2,
+      isFilled,
+      isOutline: false,
+      isClassBased: !!className,
+    });
   });
 
-  return { paths, viewBox };
+  return { paths: analyzedPaths, viewBox, hasStyleBlock };
 }
 
-// Convert hex color to THREE.Color
-function hexToColor(hex: string): any {
-  try {
-    return new THREE.Color(hex);
-  } catch {
-    return new THREE.Color('#8B5CF6');
+// === SVG PATH PARSER ===
+function parseSVGPath(d: string): THREE.Shape | null {
+  const shape = new THREE.Shape();
+  const commands = d.match(/[MmLlHhVvCcSsQqTtAaZz][^MmLlHhVvCcSsQqTtAaZz]*/g);
+  if (!commands) return null;
+
+  let cx = 0, cy = 0, sx = 0, sy = 0, first = true;
+
+  for (const cmd of commands) {
+    const type = cmd[0];
+    const nums = cmd.slice(1).trim().match(/-?[\d.]+/g)?.map(Number) || [];
+
+    switch (type) {
+      case 'M':
+        if (nums.length >= 2) {
+          cx = nums[0]; cy = nums[1];
+          shape.moveTo(cx, cy);
+          sx = cx; sy = cy; first = false;
+        }
+        break;
+      case 'm':
+        if (nums.length >= 2) {
+          cx += nums[0]; cy += nums[1];
+          shape.moveTo(cx, cy);
+          sx = cx; sy = cy; first = false;
+        }
+        break;
+      case 'L':
+        for (let i = 0; i < nums.length - 1; i += 2) {
+          shape.lineTo(nums[i], nums[i + 1]);
+          cx = nums[i]; cy = nums[i + 1];
+        }
+        break;
+      case 'l':
+        for (let i = 0; i < nums.length - 1; i += 2) {
+          cx += nums[i]; cy += nums[i + 1];
+          shape.lineTo(cx, cy);
+        }
+        break;
+      case 'H':
+        for (const n of nums) { shape.lineTo(n, cy); cx = n; }
+        break;
+      case 'h':
+        for (const n of nums) { cx += n; shape.lineTo(cx, cy); }
+        break;
+      case 'V':
+        for (const n of nums) { shape.lineTo(cx, n); cy = n; }
+        break;
+      case 'v':
+        for (const n of nums) { cy += n; shape.lineTo(cx, cy); }
+        break;
+      case 'C':
+        for (let i = 0; i < nums.length - 4; i += 6) {
+          shape.bezierCurveTo(nums[i], nums[i+1], nums[i+2], nums[i+3], nums[i+4], nums[i+5]);
+          cx = nums[i+4]; cy = nums[i+5];
+        }
+        break;
+      case 'c':
+        for (let i = 0; i < nums.length - 4; i += 6) {
+          shape.bezierCurveTo(cx+nums[i], cy+nums[i+1], cx+nums[i+2], cy+nums[i+3], cx+nums[i+4], cy+nums[i+5]);
+          cx += nums[i+4]; cy += nums[i+5];
+        }
+        break;
+      case 'Q':
+        for (let i = 0; i < nums.length - 2; i += 4) {
+          shape.quadraticCurveTo(nums[i], nums[i+1], nums[i+2], nums[i+3]);
+          cx = nums[i+2]; cy = nums[i+3];
+        }
+        break;
+      case 'q':
+        for (let i = 0; i < nums.length - 2; i += 4) {
+          shape.quadraticCurveTo(cx+nums[i], cy+nums[i+1], cx+nums[i+2], cy+nums[i+3]);
+          cx += nums[i+2]; cy += nums[i+3];
+        }
+        break;
+      case 'Z': case 'z':
+        shape.lineTo(sx, sy);
+        cx = sx; cy = sy;
+        break;
+      case 'A': case 'a':
+        if (nums.length >= 7) {
+          const ex = type === 'A' ? nums[5] : cx + nums[5];
+          const ey = type === 'A' ? nums[6] : cy + nums[6];
+          shape.lineTo(ex, ey);
+          cx = ex; cy = ey;
+        }
+        break;
+    }
   }
+  return shape;
 }
 
-export default function SVGToThree({ svgContent, depth = 40, bevelEnabled = true }: SVGToThreeProps) {
+// === UTILITY ===
+function hexToColor(hex: string): THREE.Color {
+  try { return new THREE.Color(hex); } catch { return new THREE.Color('#8B5CF6'); }
+}
+
+function createGradientTexture(color1: string, color2: string, angle: number): THREE.Texture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d')!;
+
+  const rad = (angle * Math.PI) / 180;
+  const x1 = 256 - Math.cos(rad) * 256;
+  const y1 = 256 - Math.sin(rad) * 256;
+  const x2 = 256 + Math.cos(rad) * 256;
+  const y2 = 256 + Math.sin(rad) * 256;
+
+  const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+  gradient.addColorStop(0, color1);
+  gradient.addColorStop(1, color2);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 512, 512);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
+}
+
+// === MAIN COMPONENT ===
+export default function SVGToThree({
+  svgContent,
+  depth = 40,
+  bevelEnabled = true,
+  renderMode = 'smart',
+  materialPreset,
+  customColor,
+  metalness = 0.1,
+  roughness = 0.4,
+  lightIntensity = 1.5,
+  lightColor = '#ffffff',
+  bgType = 'gradient',
+  bgColors = ['#1a1a2e', '#16213e'],
+  bgAngle = 135,
+}: SVGToThreeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<any | null>(null);
-  const cameraRef = useRef<any | null>(null);
-  const rendererRef = useRef<any | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
-  const modelGroupRef = useRef<any | null>(null);
+  const modelGroupRef = useRef<THREE.Group | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
   const animationRef = useRef<number>(0);
 
   const [autoRotate, setAutoRotate] = useState(true);
-  const [stats, setStats] = useState({ paths: 0, meshes: 0, triangles: 0 });
+  const [stats, setStats] = useState({ paths: 0, filled: 0, outline: 0, meshes: 0, triangles: 0 });
+
+  // Get effective material settings
+  const effectiveColor = materialPreset?.name !== 'custom' && materialPreset
+    ? materialPreset.color
+    : (customColor || '#8B5CF6');
+  const effectiveMetalness = materialPreset?.name !== 'custom' && materialPreset
+    ? materialPreset.metalness
+    : metalness;
+  const effectiveRoughness = materialPreset?.name !== 'custom' && materialPreset
+    ? materialPreset.roughness
+    : roughness;
 
   // Build 3D scene
   useEffect(() => {
@@ -342,43 +411,49 @@ export default function SVGToThree({ svgContent, depth = 40, bevelEnabled = true
 
     const container = containerRef.current;
     let animFrameId = 0;
-    
-    // Wait for container to have proper dimensions (mobile fix)
+
     const initScene = () => {
       const width = container.clientWidth;
       const height = container.clientHeight || 400;
-      
+
       if (width === 0 || height === 0) {
-        // Container not ready, retry
         animFrameId = requestAnimationFrame(initScene);
         return;
       }
 
       // Clean up previous
       if (rendererRef.current) {
-        const domElement = rendererRef.current.domElement;
-        if (domElement && domElement.parentNode === container) {
-          container.removeChild(domElement);
-        }
+        const dom = rendererRef.current.domElement;
+        if (dom && dom.parentNode === container) container.removeChild(dom);
         rendererRef.current.dispose();
       }
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
 
       // Scene
       const scene = new THREE.Scene();
-      scene.background = new THREE.Color('#1a1a2e');
       sceneRef.current = scene;
 
-      // Camera - better angle for 3D visibility
+      // Background
+      if (bgType === 'gradient') {
+        const tex = createGradientTexture(bgColors[0] || '#1a1a2e', bgColors[1] || '#16213e', bgAngle);
+        scene.background = tex;
+      } else if (bgType === 'solid') {
+        scene.background = new THREE.Color(bgColors[0] || '#1a1a2e');
+      } else {
+        scene.background = null; // transparent
+      }
+
+      // Camera
       const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 10000);
       camera.position.set(200, 200, 200);
       camera.lookAt(0, 0, 0);
       cameraRef.current = camera;
 
       // Renderer
-      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: bgType === 'transparent',
+      });
       renderer.setSize(width, height);
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       renderer.shadowMap.enabled = true;
@@ -401,139 +476,193 @@ export default function SVGToThree({ svgContent, depth = 40, bevelEnabled = true
       controlsRef.current = controls;
 
       // === LIGHTING ===
-      // Strong ambient for base visibility
       const ambient = new THREE.AmbientLight(0xffffff, 0.8);
       scene.add(ambient);
 
-      // Main directional light from top-right-front
-      const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+      const dirLight = new THREE.DirectionalLight(hexToColor(lightColor), lightIntensity);
       dirLight.position.set(200, 300, 200);
       dirLight.castShadow = true;
-      dirLight.shadow.mapSize.width = 1024;
-      dirLight.shadow.mapSize.height = 1024;
+      dirLight.shadow.mapSize.set(1024, 1024);
       scene.add(dirLight);
 
-      // Fill light from left
       const fillLight = new THREE.DirectionalLight(0x8B5CF6, 0.6);
       fillLight.position.set(-200, 100, 100);
       scene.add(fillLight);
 
-      // Rim light from behind for depth
       const rimLight = new THREE.DirectionalLight(0xA78BFA, 0.4);
       rimLight.position.set(0, 100, -200);
       scene.add(rimLight);
 
-      // Top light for highlight
       const topLight = new THREE.DirectionalLight(0xffffff, 0.3);
       topLight.position.set(0, 400, 0);
       scene.add(topLight);
 
-      // Ground grid - very subtle
+      // Grid
       const gridHelper = new THREE.GridHelper(500, 10, 0x222244, 0x1a1a33);
       gridHelper.position.y = -1;
-      gridHelper.material.transparent = true;
-      gridHelper.material.opacity = 0.3;
+      (gridHelper.material as THREE.Material).transparent = true;
+      (gridHelper.material as THREE.Material).opacity = 0.3;
       scene.add(gridHelper);
 
-      // === PARSE SVG & BUILD 3D MODEL ===
-      let { paths, viewBox } = parseSVG(svgContent);
-      console.log('SVG parsed:', paths.length, 'paths, viewBox:', viewBox);
-      
-      // Limit paths for mobile performance (max 50)
+      // === ANALYZE SVG & BUILD 3D ===
+      const { paths, viewBox } = analyzeSVG(svgContent);
+      console.log('SVG analyzed:', paths.length, 'paths');
+      console.log('  Filled:', paths.filter(p => p.isFilled).length);
+      console.log('  Outline:', paths.filter(p => p.isOutline).length);
+
       const MAX_PATHS = 50;
-      if (paths.length > MAX_PATHS) {
-        console.log(`Limiting paths: ${paths.length} → ${MAX_PATHS}`);
-        paths = paths.slice(0, MAX_PATHS);
-      }
+      const limitedPaths = paths.slice(0, MAX_PATHS);
 
       const modelGroup = new THREE.Group();
+      const centerX = viewBox.x + viewBox.width / 2;
+      const centerY = viewBox.y + viewBox.height / 2;
+      const maxSize = Math.max(viewBox.width, viewBox.height);
+      const scale = 200 / maxSize;
 
-      if (paths.length > 0) {
-        // Calculate center and scale
-        const centerX = viewBox.x + viewBox.width / 2;
-        const centerY = viewBox.y + viewBox.height / 2;
-        const maxSize = Math.max(viewBox.width, viewBox.height);
-        const scale = 200 / maxSize; // Scale to fit in 200 units
+      let meshCount = 0;
+      let totalTriangles = 0;
+      let filledCount = 0;
+      let outlineCount = 0;
 
-        let meshCount = 0;
-        let totalTriangles = 0;
+      limitedPaths.forEach((analyzed) => {
+        const { d, fill, stroke, isFilled, isOutline } = analyzed;
 
-        paths.forEach(({ d, fill }) => {
-          const shape = parseSVGPath(d);
-          if (!shape) return;
+        // === RENDER MODE DECISION ===
+        let shouldExtrude = false;
+        let shouldWireframe = false;
+        let extrudeDepth = depth;
+        let useColor = fill;
+        let useBevel = bevelEnabled;
 
-          // Center the shape
-          const centeredShape = new THREE.Shape();
-          const points = shape.getPoints(50);
-          if (points.length < 3) return;
+        switch (renderMode) {
+          case 'smart':
+            // Smart Auto: filled paths = extrude, outline paths = edge
+            if (isFilled) {
+              shouldExtrude = true;
+              useColor = fill;
+              filledCount++;
+            } else if (isOutline) {
+              // Outline: thin extrusion with glow
+              shouldExtrude = true;
+              extrudeDepth = depth * 0.3;
+              useBevel = false;
+              useColor = stroke;
+              outlineCount++;
+            } else {
+              // Default: extrude with default color
+              shouldExtrude = true;
+              useColor = effectiveColor;
+              filledCount++;
+            }
+            break;
 
-          centeredShape.moveTo(
-            (points[0].x - centerX) * scale,
-            -(points[0].y - centerY) * scale // Flip Y
+          case 'filled':
+            // Force Filled: semua path jadi solid
+            shouldExtrude = true;
+            useColor = isFilled ? fill : effectiveColor;
+            useBevel = bevelEnabled;
+            filledCount++;
+            break;
+
+          case 'outline':
+            // Force Outline: semua jadi edge/wireframe glow
+            shouldExtrude = true;
+            extrudeDepth = depth * 0.2;
+            useBevel = false;
+            useColor = isFilled ? fill : effectiveColor;
+            outlineCount++;
+            break;
+
+          case 'wireframe':
+            // Wireframe Skeleton: pure wireframe
+            shouldExtrude = true;
+            shouldWireframe = true;
+            extrudeDepth = depth * 0.1;
+            useBevel = false;
+            useColor = effectiveColor;
+            outlineCount++;
+            break;
+        }
+
+        if (!shouldExtrude) return;
+
+        const shape = parseSVGPath(d);
+        if (!shape) return;
+
+        // Center the shape
+        const centeredShape = new THREE.Shape();
+        const points = shape.getPoints(50);
+        if (points.length < 3) return;
+
+        centeredShape.moveTo(
+          (points[0].x - centerX) * scale,
+          -(points[0].y - centerY) * scale
+        );
+        for (let i = 1; i < points.length; i++) {
+          centeredShape.lineTo(
+            (points[i].x - centerX) * scale,
+            -(points[i].y - centerY) * scale
           );
-          for (let i = 1; i < points.length; i++) {
-            centeredShape.lineTo(
-              (points[i].x - centerX) * scale,
-              -(points[i].y - centerY) * scale
-            );
-          }
+        }
 
-          // Extrude settings - REAL 3D depth
-          const extrudeSettings = {
-            depth: depth,
-            bevelEnabled: bevelEnabled,
-            bevelThickness: depth * 0.15,
-            bevelSize: depth * 0.1,
-            bevelSegments: 3,
-            steps: 1,
-          };
+        // Extrude
+        const extrudeSettings: THREE.ExtrudeGeometryOptions = {
+          depth: extrudeDepth,
+          bevelEnabled: useBevel,
+          bevelThickness: useBevel ? extrudeDepth * 0.15 : 0,
+          bevelSize: useBevel ? extrudeDepth * 0.1 : 0,
+          bevelSegments: useBevel ? 3 : 0,
+          steps: 1,
+        };
 
-          const geometry = new THREE.ExtrudeGeometry(centeredShape, extrudeSettings);
-          
-          // Material with the SVG fill color - better for 3D
-          const material = new THREE.MeshStandardMaterial({
-            color: hexToColor(fill),
-            roughness: 0.4,
-            metalness: 0.1,
-            side: THREE.DoubleSide,
-            flatShading: false,
-          });
+        const geometry = new THREE.ExtrudeGeometry(centeredShape, extrudeSettings);
 
-          const mesh = new THREE.Mesh(geometry, material);
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-          
-          // Lay flat (extrude along Z, then rotate to be horizontal)
-          mesh.rotation.x = -Math.PI / 2;
-          // Center vertically
-          mesh.position.y = 0;
-
-          modelGroup.add(mesh);
-          meshCount++;
-          totalTriangles += geometry.attributes.position.count / 3;
+        // Material
+        const material = new THREE.MeshStandardMaterial({
+          color: hexToColor(useColor),
+          roughness: effectiveRoughness,
+          metalness: effectiveMetalness,
+          side: THREE.DoubleSide,
+          flatShading: renderMode === 'wireframe',
+          wireframe: shouldWireframe,
         });
 
-        console.log(`Created ${meshCount} meshes, ~${totalTriangles} triangles`);
-        setStats({ paths: paths.length, meshes: meshCount, triangles: Math.round(totalTriangles) });
-      }
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.rotation.x = -Math.PI / 2;
+        mesh.position.y = 0;
+
+        modelGroup.add(mesh);
+        meshCount++;
+        totalTriangles += geometry.attributes.position.count / 3;
+      });
+
+      setStats({
+        paths: limitedPaths.length,
+        filled: filledCount,
+        outline: outlineCount,
+        meshes: meshCount,
+        triangles: Math.round(totalTriangles),
+      });
 
       scene.add(modelGroup);
       modelGroupRef.current = modelGroup;
 
-      // Fit camera to model
+      // Fit camera
       const box = new THREE.Box3().setFromObject(modelGroup);
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = camera.fov * (Math.PI / 180);
       let cameraZ = Math.abs(maxDim / (2 * Math.tan(fov / 2)));
-      cameraZ *= 2.5; // Pull back more for better perspective
+      cameraZ *= 2.5;
       camera.position.set(cameraZ * 0.8, cameraZ * 0.8, cameraZ);
       camera.lookAt(center);
       controls.target.copy(center);
       controls.update();
 
-      // === ANIMATION LOOP ===
+      // Animate
       const animate = () => {
         animationRef.current = requestAnimationFrame(animate);
         controls.update();
@@ -541,7 +670,7 @@ export default function SVGToThree({ svgContent, depth = 40, bevelEnabled = true
       };
       animate();
 
-      // Handle resize
+      // Resize
       const handleResize = () => {
         const w = container.clientWidth;
         const h = container.clientHeight || 400;
@@ -551,13 +680,11 @@ export default function SVGToThree({ svgContent, depth = 40, bevelEnabled = true
       };
       window.addEventListener('resize', handleResize);
 
-      // Store for cleanup
       (window as any).__svgToThree_cleanup = () => {
         window.removeEventListener('resize', handleResize);
       };
-    }; // end initScene
-    
-    // Initialize the scene
+    };
+
     initScene();
 
     return () => {
@@ -565,47 +692,53 @@ export default function SVGToThree({ svgContent, depth = 40, bevelEnabled = true
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
       if (rendererRef.current) {
         rendererRef.current.dispose();
-        if (rendererRef.current.domElement && container.contains(rendererRef.current.domElement)) {
-          container.removeChild(rendererRef.current.domElement);
-        }
+        const dom = rendererRef.current.domElement;
+        if (dom && container.contains(dom)) container.removeChild(dom);
       }
       if ((window as any).__svgToThree_cleanup) {
         (window as any).__svgToThree_cleanup();
       }
     };
-  }, [svgContent, depth, bevelEnabled]);
+  }, [svgContent, depth, bevelEnabled, renderMode, effectiveColor, effectiveMetalness, effectiveRoughness, lightIntensity, lightColor, bgType, bgColors, bgAngle]);
 
   // Toggle auto-rotate
   const toggleAutoRotate = useCallback(() => {
     setAutoRotate(prev => {
       const next = !prev;
-      if (controlsRef.current) {
-        controlsRef.current.autoRotate = next;
-      }
+      if (controlsRef.current) controlsRef.current.autoRotate = next;
       return next;
     });
   }, []);
 
-  // Reset camera to default position
+  // Reset camera
   const resetCamera = useCallback(() => {
     if (cameraRef.current && controlsRef.current && modelGroupRef.current) {
       const camera = cameraRef.current;
       const controls = controlsRef.current;
-      const modelGroup = modelGroupRef.current;
-      
-      const box = new THREE.Box3().setFromObject(modelGroup);
+      const box = new THREE.Box3().setFromObject(modelGroupRef.current);
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = camera.fov * (Math.PI / 180);
       let cameraZ = Math.abs(maxDim / (2 * Math.tan(fov / 2)));
       cameraZ *= 2.5;
-      
       camera.position.set(cameraZ * 0.8, cameraZ * 0.8, cameraZ);
       camera.lookAt(center);
       controls.target.copy(center);
       controls.update();
     }
+  }, []);
+
+  // Capture render
+  const captureRender = useCallback(() => {
+    if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return;
+    const renderer = rendererRef.current;
+    renderer.render(sceneRef.current, cameraRef.current);
+    const dataUrl = renderer.domElement.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = '3d-render.png';
+    a.click();
   }, []);
 
   // Export GLTF
@@ -664,45 +797,58 @@ export default function SVGToThree({ svgContent, depth = 40, bevelEnabled = true
         <button
           onClick={resetCamera}
           className="px-4 py-2 rounded-xl font-semibold text-sm bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all"
-          title="Reset kamera ke posisi awal"
         >
           🎯 Reset Kamera
+        </button>
+
+        <button
+          onClick={captureRender}
+          className="px-4 py-2 rounded-xl font-semibold text-sm bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:opacity-90 transition-all"
+        >
+          📸 Capture Render
         </button>
 
         <button
           onClick={handleExportGLTF}
           className="px-4 py-2 rounded-xl font-semibold text-sm bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:opacity-90 transition-all"
         >
-          📥 Unduh GLTF (.glb)
+          📥 GLTF (.glb)
         </button>
 
         <button
           onClick={handleExportOBJ}
           className="px-4 py-2 rounded-xl font-semibold text-sm bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all"
         >
-          📥 Unduh OBJ
+          📥 OBJ
         </button>
-
-        <span className="text-xs text-slate-500 ml-auto">
-          GLTF: web & viewer | OBJ: 3D printing
-        </span>
       </div>
 
       {/* Stats */}
-      <div className="flex gap-4 text-xs text-slate-400">
+      <div className="flex gap-4 text-xs text-slate-400 flex-wrap">
         <span>📐 {stats.paths} paths</span>
+        <span>🎨 {stats.filled} filled</span>
+        <span>✏️ {stats.outline} outline</span>
         <span>🧊 {stats.meshes} meshes</span>
         <span>🔺 {stats.triangles.toLocaleString()} triangles</span>
+      </div>
+
+      {/* SVG Analysis Info */}
+      <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700/30">
+        <p className="text-xs text-slate-500">
+          🧠 <strong>Smart Auto:</strong> Path dengan fill = diekstrusi solid | Path dengan stroke doang = edge tipis
+          {renderMode === 'outline' && ' | Mode Outline: semua jadi wireframe glow'}
+          {renderMode === 'wireframe' && ' | Mode Wireframe: pure skeleton'}
+        </p>
       </div>
 
       {/* 3D Viewport */}
       <div className="relative rounded-2xl overflow-hidden border border-slate-700/50">
         <div
           ref={containerRef}
-          className="w-full bg-[#1a1a2e]"
+          className="w-full"
           style={{ height: '400px' }}
         />
-        
+
         {/* Controls overlay */}
         <div className="absolute bottom-3 right-3 flex flex-col gap-2">
           <div className="bg-black/50 backdrop-blur-sm rounded-lg px-3 py-1.5 text-xs text-slate-400">
