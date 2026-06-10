@@ -706,14 +706,16 @@ export default function SVGToThree({
         mesh.rotation.x = -Math.PI / 2;
         
         // === EMBOSSED STACKING ===
-        // Each path gets a different depth offset for layered/3D effect
+        // Each path gets a subtle depth offset for layered/3D effect
         if (stackingMode === 'embossed') {
-          // Embossed: each layer stacks on top, background = lowest
-          const layerOffset = meshCount * (depth * 0.15);
-          mesh.position.y = layerOffset;
+          // Embossed: small offset per layer, centered around 0
+          const totalLayers = limitedPaths.length || 1;
+          const layerStep = depth * 0.04; // Much smaller step (4% of depth)
+          const offset = (meshCount - (totalLayers - 1) / 2) * layerStep;
+          mesh.position.y = offset;
         } else if (stackingMode === 'layered') {
           // Layered: alternating slight offsets for depth separation
-          const layerOffset = meshCount % 2 === 0 ? 0 : depth * 0.1;
+          const layerOffset = meshCount % 2 === 0 ? 0 : depth * 0.03;
           mesh.position.y = layerOffset;
         } else {
           mesh.position.y = 0;
