@@ -41,6 +41,8 @@ export default function PngToSvgConverter({ onSvgGenerated }: PngToSvgConverterP
   const [fileName, setFileName] = useState<string>('');
   const [isConverting, setIsConverting] = useState(false);
   const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
+  const [removeBg, setRemoveBg] = useState(true);
+  const [bgThreshold, setBgThreshold] = useState(30);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const qualityPresets = {
@@ -98,11 +100,43 @@ export default function PngToSvgConverter({ onSvgGenerated }: PngToSvgConverterP
 
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      // Get image data
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      // Remove background if enabled
+      if (removeBg) {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        const w = canvas.width;
+        const h = canvas.height;
+
+        // Sample background color from 4 corners
+        const corners = [
+          [0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]
+        ];
+        let bgR = 0, bgG = 0, bgB = 0;
+        for (const [cx, cy] of corners) {
+          const idx = (cy * w + cx) * 4;
+          bgR += data[idx];
+          bgG += data[idx + 1];
+          bgB += data[idx + 2];
+        }
+        bgR = Math.round(bgR / 4);
+        bgG = Math.round(bgG / 4);
+        bgB = Math.round(bgB / 4);
+
+        // Make pixels matching background color transparent
+        const thresh = bgThreshold;
+        for (let i = 0; i < data.length; i += 4) {
+          const dr = Math.abs(data[i] - bgR);
+          const dg = Math.abs(data[i + 1] - bgG);
+          const db = Math.abs(data[i + 2] - bgB);
+          if (dr <= thresh && dg <= thresh && db <= thresh) {
+            data[i + 3] = 0; // Make transparent
+          }
+        }
+        ctx.putImageData(imageData, 0, 0);
+      }
 
       // Convert to SVG using ImageTracer
-      const options = qualityPresets[quality];
+      const options = { ...qualityPresets[quality], background: 16777215 };
       const dataUrl = canvas.toDataURL('image/png');
       
       const svgString = await new Promise<string>((resolve, reject) => {
@@ -125,7 +159,7 @@ export default function PngToSvgConverter({ onSvgGenerated }: PngToSvgConverterP
     } finally {
       setIsConverting(false);
     }
-  }, [preview, quality, fileName, onSvgGenerated]);
+  }, [preview, quality, fileName, onSvgGenerated, removeBg, bgThreshold]);
 
   const handleDownloadSvg = useCallback(() => {
     if (!svgPreview) return;
@@ -217,6 +251,44 @@ export default function PngToSvgConverter({ onSvgGenerated }: PngToSvgConverterP
              quality === 'medium' ? 'Keseimbangan cepat & detail' :
              'Hasil paling detail, proses lebih lama'}
           </p>
+        </div>
+      )}
+
+      {/* Remove Background */}
+      {preview && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-gray-400">Hapus Background</label>
+            <button
+              onClick={() => { setRemoveBg(!removeBg); setSvgPreview(null); }}
+              className={`relative w-10 h-5 rounded-full transition-colors ${
+                removeBg ? 'bg-emerald-600' : 'bg-gray-700'
+              }`}
+            >
+              <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                removeBg ? 'translate-x-5' : 'translate-x-0.5'
+              }`} />
+            </button>
+          </div>
+          {removeBg && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[10px] text-gray-500">Toleransi Warna</label>
+                <span className="text-[10px] text-emerald-400">{bgThreshold}</span>
+              </div>
+              <input
+                type="range"
+                min="5"
+                max="80"
+                value={bgThreshold}
+                onChange={(e) => { setBgThreshold(Number(e.target.value)); setSvgPreview(null); }}
+                className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+              />
+              <p className="text-[10px] text-gray-600 mt-1">
+                Naikkin kalau background gak hilang semua
+              </p>
+            </div>
+          )}
         </div>
       )}
 
