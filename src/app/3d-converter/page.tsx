@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, Suspense, lazy, Component, type ReactNode, type ErrorInfo } from 'react';
-import type { RenderMode, BgType, MaterialPreset } from '@/components/SVGToThree';
+import type { RenderMode, BgType, MaterialPreset, StackingMode } from '@/components/SVGToThree';
 import { MATERIAL_PRESETS } from '@/components/SVGToThree';
 
 // Lazy load Three.js component
@@ -100,6 +100,9 @@ export default function ThreeDConverterPage() {
   const [bgColor1, setBgColor1] = useState('#1a1a2e');
   const [bgColor2, setBgColor2] = useState('#16213e');
   const [bgAngle, setBgAngle] = useState(135);
+  const [stackingMode, setStackingMode] = useState<StackingMode>('flat');
+  const [bloomStrength, setBloomStrength] = useState(0.3);
+  const [bloomRadius, setBloomRadius] = useState(0.5);
 
   useState(() => { setWebglSupported(checkWebGLSupport()); });
 
@@ -296,6 +299,31 @@ export default function ThreeDConverterPage() {
                       <div className={`w-4 h-4 bg-white rounded-full transition-all ${bevelEnabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
                     </button>
                   </div>
+
+                  {/* Stacking Layout */}
+                  <div>
+                    <label className="text-xs text-slate-400 mb-2 block">Stacking Layout</label>
+                    <div className="space-y-1.5">
+                      {([
+                        { value: 'flat', label: '📄 Flat', desc: 'Semua path sejajar' },
+                        { value: 'embossed', label: '🏔️ Embossed', desc: 'Tiap layer bertumpuk' },
+                        { value: 'layered', label: '📚 Layered', desc: 'Alternating depth' },
+                      ] as { value: StackingMode; label: string; desc: string }[]).map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => setStackingMode(opt.value)}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-all ${
+                            stackingMode === opt.value
+                              ? 'bg-purple-600/30 border border-purple-500/50 text-purple-300'
+                              : 'bg-slate-800/50 border border-slate-700/30 text-slate-400 hover:bg-slate-700/50'
+                          }`}
+                        >
+                          <div className="font-medium">{opt.label}</div>
+                          <div className="text-[10px] opacity-70">{opt.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </Section>
 
                 {/* Material Section */}
@@ -369,6 +397,24 @@ export default function ThreeDConverterPage() {
                       ))}
                     </div>
                   </div>
+
+                  {/* Bloom / Glow */}
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-slate-400">Bloom / Glow</span>
+                      <span className="text-purple-400 font-mono">{bloomStrength.toFixed(1)}</span>
+                    </div>
+                    <input type="range" min="0" max="20" value={bloomStrength * 10} onChange={(e) => setBloomStrength(Number(e.target.value) / 10)} className="w-full accent-purple-500" />
+                  </div>
+                  {bloomStrength > 0 && (
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-slate-400">Bloom Radius</span>
+                        <span className="text-purple-400 font-mono">{bloomRadius.toFixed(1)}</span>
+                      </div>
+                      <input type="range" min="0" max="10" value={bloomRadius * 10} onChange={(e) => setBloomRadius(Number(e.target.value) / 10)} className="w-full accent-purple-500" />
+                    </div>
+                  )}
                 </Section>
 
                 {/* Environment Section */}
@@ -450,6 +496,9 @@ export default function ThreeDConverterPage() {
                     bgType={bgType}
                     bgColors={[bgColor1, bgColor2]}
                     bgAngle={bgAngle}
+                    stackingMode={stackingMode}
+                    bloomStrength={bloomStrength}
+                    bloomRadius={bloomRadius}
                   />
                 </Suspense>
               </ErrorBoundary>

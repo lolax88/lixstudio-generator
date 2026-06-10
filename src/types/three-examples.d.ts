@@ -49,3 +49,44 @@ declare module 'three/examples/jsm/exporters/OBJExporter.js' {
     parse(input: Object3D): string;
   }
 }
+
+declare module 'three/examples/jsm/postprocessing/EffectComposer.js' {
+  import { WebGLRenderer, Scene, Camera, Vector2 } from 'three';
+  import { Pass } from 'three/examples/jsm/postprocessing/Pass.js';
+  export class EffectComposer {
+    constructor(renderer: WebGLRenderer, renderTarget?: any);
+    addPass(pass: Pass): void;
+    render(): void;
+    setSize(width: number, height: number): void;
+    dispose(): void;
+  }
+}
+
+declare module 'three/examples/jsm/postprocessing/RenderPass.js' {
+  import { Scene, Camera } from 'three';
+  import { Pass } from 'three/examples/jsm/postprocessing/Pass.js';
+  export class RenderPass extends Pass {
+    constructor(scene: Scene, camera: Camera);
+  }
+}
+
+declare module 'three/examples/jsm/postprocessing/UnrealBloomPass.js' {
+  import { Vector2 } from 'three';
+  import { Pass } from 'three/examples/jsm/postprocessing/Pass.js';
+  export class UnrealBloomPass extends Pass {
+    constructor(resolution: Vector2, strength: number, radius: number, threshold: number);
+    strength: number;
+    radius: number;
+    threshold: number;
+  }
+}
+
+declare module 'three/examples/jsm/postprocessing/Pass.js' {
+  export class Pass {
+    enabled: boolean;
+    needsSwap: boolean;
+    renderToScreen: boolean;
+    render(renderer: any, writeBuffer: any, readBuffer: any, maskActive: boolean): void;
+    setSize(width: number, height: number): void;
+  }
+}

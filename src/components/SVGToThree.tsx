@@ -3,10 +3,14 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 
 // === TYPES ===
 export type RenderMode = 'smart' | 'filled' | 'outline' | 'wireframe';
 export type BgType = 'gradient' | 'solid' | 'transparent';
+export type StackingMode = 'flat' | 'embossed' | 'layered';
 
 export interface MaterialPreset {
   name: string;
@@ -21,6 +25,7 @@ export interface SVGToThreeProps {
   depth?: number;
   bevelEnabled?: boolean;
   renderMode?: RenderMode;
+  stackingMode?: StackingMode;
   materialPreset?: MaterialPreset;
   customColor?: string;
   metalness?: number;
@@ -30,6 +35,8 @@ export interface SVGToThreeProps {
   bgType?: BgType;
   bgColors?: string[];
   bgAngle?: number;
+  bloomStrength?: number;
+  bloomRadius?: number;
 }
 
 // === MATERIAL PRESETS ===
@@ -373,6 +380,7 @@ export default function SVGToThree({
   depth = 40,
   bevelEnabled = true,
   renderMode = 'smart',
+  stackingMode = 'flat',
   materialPreset,
   customColor,
   metalness = 0.1,
@@ -382,6 +390,8 @@ export default function SVGToThree({
   bgType = 'gradient',
   bgColors = ['#1a1a2e', '#16213e'],
   bgAngle = 135,
+  bloomStrength = 0.0,
+  bloomRadius = 0.5,
 }: SVGToThreeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<any | null>(null);
@@ -389,6 +399,7 @@ export default function SVGToThree({
   const controlsRef = useRef<OrbitControls | null>(null);
   const modelGroupRef = useRef<any | null>(null);
   const sceneRef = useRef<any | null>(null);
+  const composerRef = useRef<any | null>(null);
   const animationRef = useRef<number>(0);
 
   const [autoRotate, setAutoRotate] = useState(true);
@@ -463,6 +474,68 @@ export default function SVGToThree({
       renderer.toneMappingExposure = 1.2;
       container.appendChild(renderer.domElement);
       rendererRef.current = renderer;
+
+      // === HDRI ENVIRONMENT MAP (procedural) ===
+      // Creates realistic reflections for metallic materials
+      const pmremGenerator = new THREE.PMREMGenerator(renderer);
+      pmremGenerator.compileEquirectangularShader();
+      
+      // Create a simple environment scene for reflections
+      const envScene = new THREE.Scene();
+      // Gradient sky
+      const skyGeo = new THREE.SphereGeometry(500, 32, 16);
+      const skyMat = new THREE.ShaderMaterial({
+        uniforms: {
+          topColor: { value: new THREE.Color(0x1a1a3e) },
+          bottomColor: { value: new THREE.Color(0x3a1a5e) },
+          offset: { value: 20 },
+          exponent: { value: 0.6 },
+        },
+        vertexShader: `
+          varying vec3 vWorldPosition;
+          void main() {
+            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+            vWorldPosition = worldPosition.xyz;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 topColor;
+          uniform vec3 bottomColor;
+          uniform float offset;
+          uniform float exponent;
+          varying vec3 vWorldPosition;
+          void main() {
+            float h = normalize(vWorldPosition + offset).y;
+            gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+          }
+        `,
+        side: THREE.BackSide,
+      });
+      envScene.add(new THREE.Mesh(skyGeo, skyMat));
+      // Add some colored lights for interesting reflections
+      envScene.add(new THREE.PointLight(0xffeedd, 100, 500));
+      envScene.add(new THREE.PointLight(0x8B5CF6, 80, 500));
+      
+      const envMap = pmremGenerator.fromScene(envScene, 0.04).texture;
+      scene.environment = envMap; // All materials will use this for reflections
+      pmremGenerator.dispose();
+
+      // === BLOOM POST-PROCESSING ===
+      const composer = new EffectComposer(renderer);
+      const renderPass = new RenderPass(scene, camera);
+      composer.addPass(renderPass);
+      
+      if (bloomStrength > 0) {
+        const bloomPass = new UnrealBloomPass(
+          new THREE.Vector2(width, height),
+          bloomStrength,  // strength
+          bloomRadius,    // radius
+          0.2             // threshold
+        );
+        composer.addPass(bloomPass);
+      }
+      composerRef.current = composer;
 
       // Controls
       const controls = new OrbitControls(camera, renderer.domElement);
@@ -631,7 +704,20 @@ export default function SVGToThree({
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.rotation.x = -Math.PI / 2;
-        mesh.position.y = 0;
+        
+        // === EMBOSSED STACKING ===
+        // Each path gets a different depth offset for layered/3D effect
+        if (stackingMode === 'embossed') {
+          // Embossed: each layer stacks on top, background = lowest
+          const layerOffset = meshCount * (depth * 0.15);
+          mesh.position.y = layerOffset;
+        } else if (stackingMode === 'layered') {
+          // Layered: alternating slight offsets for depth separation
+          const layerOffset = meshCount % 2 === 0 ? 0 : depth * 0.1;
+          mesh.position.y = layerOffset;
+        } else {
+          mesh.position.y = 0;
+        }
 
         modelGroup.add(mesh);
         meshCount++;
@@ -662,11 +748,15 @@ export default function SVGToThree({
       controls.target.copy(center);
       controls.update();
 
-      // Animate
+      // Animate (use composer for bloom post-processing)
       const animate = () => {
         animationRef.current = requestAnimationFrame(animate);
         controls.update();
-        renderer.render(scene, camera);
+        if (composerRef.current) {
+          composerRef.current.render();
+        } else {
+          renderer.render(scene, camera);
+        }
       };
       animate();
 
@@ -677,6 +767,9 @@ export default function SVGToThree({
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
         renderer.setSize(w, h);
+        if (composerRef.current) {
+          composerRef.current.setSize(w, h);
+        }
       };
       window.addEventListener('resize', handleResize);
 
@@ -699,7 +792,7 @@ export default function SVGToThree({
         (window as any).__svgToThree_cleanup();
       }
     };
-  }, [svgContent, depth, bevelEnabled, renderMode, effectiveColor, effectiveMetalness, effectiveRoughness, lightIntensity, lightColor, bgType, bgColors, bgAngle]);
+  }, [svgContent, depth, bevelEnabled, renderMode, stackingMode, effectiveColor, effectiveMetalness, effectiveRoughness, lightIntensity, lightColor, bgType, bgColors, bgAngle, bloomStrength, bloomRadius]);
 
   // Toggle auto-rotate
   const toggleAutoRotate = useCallback(() => {
