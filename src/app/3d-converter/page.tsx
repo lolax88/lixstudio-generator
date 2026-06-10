@@ -127,54 +127,70 @@ export default function ThreeDConverterPage() {
     const previewUrl = URL.createObjectURL(file);
     setPngPreview(previewUrl);
     try {
-      // Preprocess: remove background if enabled
-      let dataUrl = previewUrl;
-      if (removeBg) {
-        const img = new window.Image();
-        img.crossOrigin = 'anonymous';
-        await new Promise<void>((resolve, reject) => {
-          img.onload = () => resolve();
-          img.onerror = reject;
-          img.src = previewUrl;
-        });
-        const canvas = document.createElement('canvas');
-        const maxSize = 512;
-        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
-        canvas.width = Math.floor(img.width * scale);
-        canvas.height = Math.floor(img.height * scale);
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const data = imageData.data;
-          const w = canvas.width;
-          const h = canvas.height;
-          // Sample bg color from 4 corners
-          const corners = [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]];
-          let bgR = 0, bgG = 0, bgB = 0;
-          for (const [cx, cy] of corners) {
-            const idx = (cy * w + cx) * 4;
-            bgR += data[idx]; bgG += data[idx + 1]; bgB += data[idx + 2];
-          }
-          bgR = Math.round(bgR / 4); bgG = Math.round(bgG / 4); bgB = Math.round(bgB / 4);
-          // Make matching pixels transparent
-          const thresh = bgThreshold;
-          for (let i = 0; i < data.length; i += 4) {
-            if (Math.abs(data[i] - bgR) <= thresh && Math.abs(data[i + 1] - bgG) <= thresh && Math.abs(data[i + 2] - bgB) <= thresh) {
-              data[i + 3] = 0;
-            }
-          }
-          ctx.putImageData(imageData, 0, 0);
-          dataUrl = canvas.toDataURL('image/png');
-        }
-      }
       const ImageTracer = (await import('imagetracerjs')).default;
-      const svgStr = await new Promise<string>((resolve, reject) => {
+      let svgStr = await new Promise<string>((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Timeout')), 30000);
-        ImageTracer.imageToSVG(dataUrl, (svgString: string) => {
+        ImageTracer.imageToSVG(previewUrl, (svgString: string) => {
           clearTimeout(timeout); resolve(svgString);
         }, { pathomit: 50, qtres: 1, colorsampling: 0, numberofcolors: 4, ltres: 1, strokewidth: 1, scale: 1, roundcoords: 2, viewbox: true });
       });
+      // Post-process: remove paths whose fill matches background color
+      if (removeBg) {
+        const img2 = new window.Image();
+        await new Promise<void>((resolve, reject) => {
+          img2.onload = () => resolve();
+          img2.onerror = reject;
+          img2.src = previewUrl;
+        });
+        const c2 = document.createElement('canvas');
+        c2.width = 4; c2.height = 4;
+        const ctx2 = c2.getContext('2d');
+        if (ctx2) {
+          ctx2.drawImage(img2, 0, 0, 4, 4);
+          const px = ctx2.getImageData(0, 0, 4, 4).data;
+          let r = 0, g = 0, b = 0;
+          for (let i = 0; i < px.length; i += 4) { r += px[i]; g += px[i+1]; b += px[i+2]; }
+          r = Math.round(r / 16); g = Math.round(g / 16); b = Math.round(b / 16);
+          const thresh = bgThreshold;
+          // Helper: check if rgb matches background
+          const isBg = (pr: number, pg: number, pb: number) =>
+            Math.abs(pr - r) <= thresh && Math.abs(pg - g) <= thresh && Math.abs(pb - b) <= thresh;
+          // Parse SVG into DOM, remove background paths, rebuild
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(svgStr, 'image/svg+xml');
+          const paths = doc.querySelectorAll('path, rect, polygon, ellipse, circle');
+          let removed = 0;
+          paths.forEach((el) => {
+            const fill = el.getAttribute('fill') || '';
+            const m = fill.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+            if (m && isBg(parseInt(m[1]), parseInt(m[2]), parseInt(m[3]))) {
+              el.remove(); removed++;
+            } else if (/^(white|#fff|#ffffff)$/i.test(fill) && r > 200 && g > 200 && b > 200) {
+              el.remove(); removed++;
+            } else if (/^(black|#000|#000000)$/i.test(fill) && r < 50 && g < 50 && b < 50) {
+              el.remove(); removed++;
+            }
+          });
+          // Also remove background rect from ImageTracer (it's the largest rect)
+          const rects = doc.querySelectorAll('rect');
+          rects.forEach((rect) => {
+            const w = parseFloat(rect.getAttribute('width') || '0');
+            const h = parseFloat(rect.getAttribute('height') || '0');
+            // Remove rect that covers most of the viewBox
+            const vb = doc.querySelector('svg')?.getAttribute('viewBox');
+            if (vb) {
+              const parts = vb.split(' ').map(Number);
+              if (w >= parts[2] * 0.9 && h >= parts[3] * 0.9) {
+                rect.remove(); removed++;
+              }
+            }
+          });
+          if (removed > 0) {
+            const serializer = new XMLSerializer();
+            svgStr = serializer.serializeToString(doc);
+          }
+        }
+      }
       setSvgContent(svgStr);
       setActiveTab('svg');
     } catch (err) {
