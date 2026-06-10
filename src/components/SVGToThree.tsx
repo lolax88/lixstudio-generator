@@ -341,202 +341,236 @@ export default function SVGToThree({ svgContent, depth = 40, bevelEnabled = true
     if (!containerRef.current || !svgContent) return;
 
     const container = containerRef.current;
-    const width = container.clientWidth;
-    const height = container.clientHeight || 400;
-
-    // Clean up previous
-    if (rendererRef.current) {
-      const domElement = rendererRef.current.domElement;
-      if (domElement && domElement.parentNode === container) {
-        container.removeChild(domElement);
-      }
-      rendererRef.current.dispose();
-    }
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
-    }
-
-    // Scene
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#1a1a2e');
-    sceneRef.current = scene;
-
-    // Camera - angle that shows 3D depth
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 10000);
-    camera.position.set(150, 150, 300);
-    camera.lookAt(0, 0, 0);
-    cameraRef.current = camera;
-
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    container.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
-
-    // Controls
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = 2;
-    controls.enablePan = true;
-    controls.enableZoom = true;
-    controlsRef.current = controls;
-
-    // === LIGHTING ===
-    // Ambient light for base visibility
-    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambient);
-
-    // Main directional light from top-right
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    dirLight.position.set(200, 300, 200);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 1024;
-    dirLight.shadow.mapSize.height = 1024;
-    scene.add(dirLight);
-
-    // Fill light from left
-    const fillLight = new THREE.DirectionalLight(0x8B5CF6, 0.4);
-    fillLight.position.set(-200, 100, 100);
-    scene.add(fillLight);
-
-    // Rim light from behind
-    const rimLight = new THREE.DirectionalLight(0xA78BFA, 0.3);
-    rimLight.position.set(0, 100, -200);
-    scene.add(rimLight);
-
-    // Ground grid - very subtle
-    const gridHelper = new THREE.GridHelper(500, 10, 0x222244, 0x1a1a33);
-    gridHelper.position.y = -1;
-    gridHelper.material.transparent = true;
-    gridHelper.material.opacity = 0.3;
-    scene.add(gridHelper);
-
-    // === PARSE SVG & BUILD 3D MODEL ===
-    let { paths, viewBox } = parseSVG(svgContent);
-    console.log('SVG parsed:', paths.length, 'paths');
+    let animFrameId = 0;
     
-    // Limit paths for mobile performance (max 50)
-    const MAX_PATHS = 50;
-    if (paths.length > MAX_PATHS) {
-      console.log(`Limiting paths: ${paths.length} → ${MAX_PATHS}`);
-      paths = paths.slice(0, MAX_PATHS);
-    }
+    // Wait for container to have proper dimensions (mobile fix)
+    const initScene = () => {
+      const width = container.clientWidth;
+      const height = container.clientHeight || 400;
+      
+      if (width === 0 || height === 0) {
+        // Container not ready, retry
+        animFrameId = requestAnimationFrame(initScene);
+        return;
+      }
 
-    const modelGroup = new THREE.Group();
-
-    if (paths.length > 0) {
-      // Calculate center and scale
-      const centerX = viewBox.x + viewBox.width / 2;
-      const centerY = viewBox.y + viewBox.height / 2;
-      const maxSize = Math.max(viewBox.width, viewBox.height);
-      const scale = 200 / maxSize; // Scale to fit in 200 units
-
-      let meshCount = 0;
-      let totalTriangles = 0;
-
-      paths.forEach(({ d, fill }) => {
-        const shape = parseSVGPath(d);
-        if (!shape) return;
-
-        // Center the shape
-        const centeredShape = new THREE.Shape();
-        const points = shape.getPoints(50);
-        if (points.length < 3) return;
-
-        centeredShape.moveTo(
-          (points[0].x - centerX) * scale,
-          -(points[0].y - centerY) * scale // Flip Y
-        );
-        for (let i = 1; i < points.length; i++) {
-          centeredShape.lineTo(
-            (points[i].x - centerX) * scale,
-            -(points[i].y - centerY) * scale
-          );
+      // Clean up previous
+      if (rendererRef.current) {
+        const domElement = rendererRef.current.domElement;
+        if (domElement && domElement.parentNode === container) {
+          container.removeChild(domElement);
         }
+        rendererRef.current.dispose();
+      }
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
 
-        // Extrude settings - REAL 3D depth
-        const extrudeSettings: any = {
-          depth: depth, // Real depth in units
-          bevelEnabled: bevelEnabled,
-          bevelThickness: depth * 0.15,
-          bevelSize: depth * 0.1,
-          bevelSegments: 3,
-          steps: 1,
-        };
+      // Scene
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color('#1a1a2e');
+      sceneRef.current = scene;
 
-        const geometry = new THREE.ExtrudeGeometry(centeredShape, extrudeSettings);
-        
-        // Material with the SVG fill color
-        const material = new THREE.MeshStandardMaterial({
-          color: hexToColor(fill),
-          roughness: 0.3,
-          metalness: 0.1,
-          side: THREE.DoubleSide,
+      // Camera - better angle for 3D visibility
+      const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 10000);
+      camera.position.set(200, 200, 200);
+      camera.lookAt(0, 0, 0);
+      cameraRef.current = camera;
+
+      // Renderer
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.2;
+      container.appendChild(renderer.domElement);
+      rendererRef.current = renderer;
+
+      // Controls
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.autoRotate = true;
+      controls.autoRotateSpeed = 2;
+      controls.enablePan = true;
+      controls.enableZoom = true;
+      controls.target.set(0, 0, 0);
+      controlsRef.current = controls;
+
+      // === LIGHTING ===
+      // Strong ambient for base visibility
+      const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+      scene.add(ambient);
+
+      // Main directional light from top-right-front
+      const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+      dirLight.position.set(200, 300, 200);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 1024;
+      dirLight.shadow.mapSize.height = 1024;
+      scene.add(dirLight);
+
+      // Fill light from left
+      const fillLight = new THREE.DirectionalLight(0x8B5CF6, 0.6);
+      fillLight.position.set(-200, 100, 100);
+      scene.add(fillLight);
+
+      // Rim light from behind for depth
+      const rimLight = new THREE.DirectionalLight(0xA78BFA, 0.4);
+      rimLight.position.set(0, 100, -200);
+      scene.add(rimLight);
+
+      // Top light for highlight
+      const topLight = new THREE.DirectionalLight(0xffffff, 0.3);
+      topLight.position.set(0, 400, 0);
+      scene.add(topLight);
+
+      // Ground grid - very subtle
+      const gridHelper = new THREE.GridHelper(500, 10, 0x222244, 0x1a1a33);
+      gridHelper.position.y = -1;
+      gridHelper.material.transparent = true;
+      gridHelper.material.opacity = 0.3;
+      scene.add(gridHelper);
+
+      // === PARSE SVG & BUILD 3D MODEL ===
+      let { paths, viewBox } = parseSVG(svgContent);
+      console.log('SVG parsed:', paths.length, 'paths, viewBox:', viewBox);
+      
+      // Limit paths for mobile performance (max 50)
+      const MAX_PATHS = 50;
+      if (paths.length > MAX_PATHS) {
+        console.log(`Limiting paths: ${paths.length} → ${MAX_PATHS}`);
+        paths = paths.slice(0, MAX_PATHS);
+      }
+
+      const modelGroup = new THREE.Group();
+
+      if (paths.length > 0) {
+        // Calculate center and scale
+        const centerX = viewBox.x + viewBox.width / 2;
+        const centerY = viewBox.y + viewBox.height / 2;
+        const maxSize = Math.max(viewBox.width, viewBox.height);
+        const scale = 200 / maxSize; // Scale to fit in 200 units
+
+        let meshCount = 0;
+        let totalTriangles = 0;
+
+        paths.forEach(({ d, fill }) => {
+          const shape = parseSVGPath(d);
+          if (!shape) return;
+
+          // Center the shape
+          const centeredShape = new THREE.Shape();
+          const points = shape.getPoints(50);
+          if (points.length < 3) return;
+
+          centeredShape.moveTo(
+            (points[0].x - centerX) * scale,
+            -(points[0].y - centerY) * scale // Flip Y
+          );
+          for (let i = 1; i < points.length; i++) {
+            centeredShape.lineTo(
+              (points[i].x - centerX) * scale,
+              -(points[i].y - centerY) * scale
+            );
+          }
+
+          // Extrude settings - REAL 3D depth
+          const extrudeSettings = {
+            depth: depth,
+            bevelEnabled: bevelEnabled,
+            bevelThickness: depth * 0.15,
+            bevelSize: depth * 0.1,
+            bevelSegments: 3,
+            steps: 1,
+          };
+
+          const geometry = new THREE.ExtrudeGeometry(centeredShape, extrudeSettings);
+          
+          // Material with the SVG fill color - better for 3D
+          const material = new THREE.MeshStandardMaterial({
+            color: hexToColor(fill),
+            roughness: 0.4,
+            metalness: 0.1,
+            side: THREE.DoubleSide,
+            flatShading: false,
+          });
+
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          
+          // Lay flat (extrude along Z, then rotate to be horizontal)
+          mesh.rotation.x = -Math.PI / 2;
+          // Center vertically
+          mesh.position.y = 0;
+
+          modelGroup.add(mesh);
+          meshCount++;
+          totalTriangles += geometry.attributes.position.count / 3;
         });
 
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        
-        // Lay flat (extrude along Z, then rotate to be horizontal)
-        mesh.rotation.x = -Math.PI / 2;
-        // Center vertically
-        mesh.position.y = 0;
+        console.log(`Created ${meshCount} meshes, ~${totalTriangles} triangles`);
+        setStats({ paths: paths.length, meshes: meshCount, triangles: Math.round(totalTriangles) });
+      }
 
-        modelGroup.add(mesh);
-        meshCount++;
-        totalTriangles += geometry.attributes.position.count / 3;
-      });
+      scene.add(modelGroup);
+      modelGroupRef.current = modelGroup;
 
-      console.log(`Created ${meshCount} meshes, ~${totalTriangles} triangles`);
-      setStats({ paths: paths.length, meshes: meshCount, triangles: Math.round(totalTriangles) });
-    }
-
-    scene.add(modelGroup);
-    modelGroupRef.current = modelGroup;
-
-    // Fit camera to model
-    const box = new THREE.Box3().setFromObject(modelGroup);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const fov = camera.fov * (Math.PI / 180);
-    let cameraZ = Math.abs(maxDim / (2 * Math.tan(fov / 2)));
-    cameraZ *= 2; // Pull back for better perspective
-    camera.position.set(cameraZ * 0.7, cameraZ * 0.7, cameraZ);
-    camera.lookAt(center);
-    controls.target.copy(center);
-    controls.update();
-
-    // === ANIMATION LOOP ===
-    const animate = () => {
-      animationRef.current = requestAnimationFrame(animate);
+      // Fit camera to model
+      const box = new THREE.Box3().setFromObject(modelGroup);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const fov = camera.fov * (Math.PI / 180);
+      let cameraZ = Math.abs(maxDim / (2 * Math.tan(fov / 2)));
+      cameraZ *= 2.5; // Pull back more for better perspective
+      camera.position.set(cameraZ * 0.8, cameraZ * 0.8, cameraZ);
+      camera.lookAt(center);
+      controls.target.copy(center);
       controls.update();
-      renderer.render(scene, camera);
-    };
-    animate();
 
-    // Handle resize
-    const handleResize = () => {
-      const w = container.clientWidth;
-      const h = container.clientHeight || 400;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-    };
-    window.addEventListener('resize', handleResize);
+      // === ANIMATION LOOP ===
+      const animate = () => {
+        animationRef.current = requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      };
+      animate();
+
+      // Handle resize
+      const handleResize = () => {
+        const w = container.clientWidth;
+        const h = container.clientHeight || 400;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      };
+      window.addEventListener('resize', handleResize);
+
+      // Store for cleanup
+      (window as any).__svgToThree_cleanup = () => {
+        window.removeEventListener('resize', handleResize);
+      };
+    }; // end initScene
+    
+    // Initialize the scene
+    initScene();
 
     return () => {
-      window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(animationRef.current);
-      renderer.dispose();
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
+      if (animFrameId) cancelAnimationFrame(animFrameId);
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      if (rendererRef.current) {
+        rendererRef.current.dispose();
+        if (rendererRef.current.domElement && container.contains(rendererRef.current.domElement)) {
+          container.removeChild(rendererRef.current.domElement);
+        }
+      }
+      if ((window as any).__svgToThree_cleanup) {
+        (window as any).__svgToThree_cleanup();
       }
     };
   }, [svgContent, depth, bevelEnabled]);
@@ -550,6 +584,28 @@ export default function SVGToThree({ svgContent, depth = 40, bevelEnabled = true
       }
       return next;
     });
+  }, []);
+
+  // Reset camera to default position
+  const resetCamera = useCallback(() => {
+    if (cameraRef.current && controlsRef.current && modelGroupRef.current) {
+      const camera = cameraRef.current;
+      const controls = controlsRef.current;
+      const modelGroup = modelGroupRef.current;
+      
+      const box = new THREE.Box3().setFromObject(modelGroup);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const fov = camera.fov * (Math.PI / 180);
+      let cameraZ = Math.abs(maxDim / (2 * Math.tan(fov / 2)));
+      cameraZ *= 2.5;
+      
+      camera.position.set(cameraZ * 0.8, cameraZ * 0.8, cameraZ);
+      camera.lookAt(center);
+      controls.target.copy(center);
+      controls.update();
+    }
   }, []);
 
   // Export GLTF
@@ -603,6 +659,14 @@ export default function SVGToThree({ svgContent, depth = 40, bevelEnabled = true
           }`}
         >
           {autoRotate ? '⏸️ Berhenti Putar' : '▶️ Auto Putar'}
+        </button>
+
+        <button
+          onClick={resetCamera}
+          className="px-4 py-2 rounded-xl font-semibold text-sm bg-slate-700 text-slate-300 hover:bg-slate-600 transition-all"
+          title="Reset kamera ke posisi awal"
+        >
+          🎯 Reset Kamera
         </button>
 
         <button
