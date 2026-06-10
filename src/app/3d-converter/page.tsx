@@ -103,6 +103,8 @@ export default function ThreeDConverterPage() {
   const [stackingMode, setStackingMode] = useState<StackingMode>('flat');
   const [bloomStrength, setBloomStrength] = useState(0.3);
   const [bloomRadius, setBloomRadius] = useState(0.5);
+  const [removeBg, setRemoveBg] = useState(true);
+  const [bgThreshold, setBgThreshold] = useState(30);
 
   useState(() => { setWebglSupported(checkWebGLSupport()); });
 
@@ -125,10 +127,51 @@ export default function ThreeDConverterPage() {
     const previewUrl = URL.createObjectURL(file);
     setPngPreview(previewUrl);
     try {
+      // Preprocess: remove background if enabled
+      let dataUrl = previewUrl;
+      if (removeBg) {
+        const img = new window.Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = reject;
+          img.src = previewUrl;
+        });
+        const canvas = document.createElement('canvas');
+        const maxSize = 512;
+        const scale = Math.min(maxSize / img.width, maxSize / img.height, 1);
+        canvas.width = Math.floor(img.width * scale);
+        canvas.height = Math.floor(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+          const w = canvas.width;
+          const h = canvas.height;
+          // Sample bg color from 4 corners
+          const corners = [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]];
+          let bgR = 0, bgG = 0, bgB = 0;
+          for (const [cx, cy] of corners) {
+            const idx = (cy * w + cx) * 4;
+            bgR += data[idx]; bgG += data[idx + 1]; bgB += data[idx + 2];
+          }
+          bgR = Math.round(bgR / 4); bgG = Math.round(bgG / 4); bgB = Math.round(bgB / 4);
+          // Make matching pixels transparent
+          const thresh = bgThreshold;
+          for (let i = 0; i < data.length; i += 4) {
+            if (Math.abs(data[i] - bgR) <= thresh && Math.abs(data[i + 1] - bgG) <= thresh && Math.abs(data[i + 2] - bgB) <= thresh) {
+              data[i + 3] = 0;
+            }
+          }
+          ctx.putImageData(imageData, 0, 0);
+          dataUrl = canvas.toDataURL('image/png');
+        }
+      }
       const ImageTracer = (await import('imagetracerjs')).default;
       const svgStr = await new Promise<string>((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Timeout')), 30000);
-        ImageTracer.imageToSVG(previewUrl, (svgString: string) => {
+        ImageTracer.imageToSVG(dataUrl, (svgString: string) => {
           clearTimeout(timeout); resolve(svgString);
         }, { pathomit: 50, qtres: 1, colorsampling: 0, numberofcolors: 4, ltres: 1, strokewidth: 1, scale: 1, roundcoords: 2, viewbox: true });
       });
@@ -138,7 +181,7 @@ export default function ThreeDConverterPage() {
       console.error('PNG conversion error:', err);
       alert('Gagal convert PNG ke SVG.');
     } finally { setIsConverting(false); }
-  }, []);
+  }, [removeBg, bgThreshold]);
 
   // Drag and drop
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -233,20 +276,51 @@ export default function ThreeDConverterPage() {
 
         {/* PNG Upload Tab */}
         {activeTab === 'png' && (
-          <div
-            onDrop={handleDrop}
-            onDragOver={(e) => e.preventDefault()}
-            onClick={() => pngInputRef.current?.click()}
-            className="border-2 border-dashed border-slate-600 hover:border-purple-500 rounded-2xl p-8 text-center cursor-pointer transition-all hover:bg-slate-800/50 mb-6"
-          >
-            <input ref={pngInputRef} type="file" accept="image/png" onChange={handlePNGUpload} className="hidden" />
-            {isConverting ? (
-              <div><div className="text-4xl mb-2 animate-spin">⏳</div><p className="text-purple-400 font-semibold">Mengkonversi...</p></div>
-            ) : pngPreview ? (
-              <div><div className="text-4xl mb-2">✅</div><p className="text-purple-400 font-semibold">{fileName}</p></div>
-            ) : (
-              <div><div className="text-4xl mb-2">🖼️</div><p className="text-slate-300 font-semibold">Drop file PNG di sini</p></div>
-            )}
+          <div className="mb-6 space-y-3">
+            <div
+              onDrop={handleDrop}
+              onDragOver={(e) => e.preventDefault()}
+              onClick={() => pngInputRef.current?.click()}
+              className="border-2 border-dashed border-slate-600 hover:border-purple-500 rounded-2xl p-8 text-center cursor-pointer transition-all hover:bg-slate-800/50"
+            >
+              <input ref={pngInputRef} type="file" accept="image/png" onChange={handlePNGUpload} className="hidden" />
+              {isConverting ? (
+                <div><div className="text-4xl mb-2 animate-spin">⏳</div><p className="text-purple-400 font-semibold">Mengkonversi...</p></div>
+              ) : pngPreview ? (
+                <div><div className="text-4xl mb-2">✅</div><p className="text-purple-400 font-semibold">{fileName}</p></div>
+              ) : (
+                <div><div className="text-4xl mb-2">🖼️</div><p className="text-slate-300 font-semibold">Drop file PNG di sini</p></div>
+              )}
+            </div>
+            {/* Background removal toggle */}
+            <div className="bg-slate-900/80 border border-slate-700/50 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-slate-300">🔲 Hapus Background</label>
+                <button
+                  onClick={() => setRemoveBg(!removeBg)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${removeBg ? 'bg-purple-600' : 'bg-slate-700'}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${removeBg ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+              {removeBg && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] text-slate-500">Toleransi Warna</label>
+                    <span className="text-[10px] text-purple-400">{bgThreshold}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={5}
+                    max={80}
+                    value={bgThreshold}
+                    onChange={(e) => setBgThreshold(Number(e.target.value))}
+                    className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                  />
+                  <p className="text-[10px] text-slate-600 mt-1">Naikkin kalau background gak hilang semua</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
